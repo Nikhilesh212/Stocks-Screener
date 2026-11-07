@@ -194,6 +194,28 @@ def bhavcopy(d: dt.date) -> tuple[pd.DataFrame, str, str]:
 
 # ---------------------------------------------------------------- CLI
 
+CA_NUMBER_FIELDS = {"factor": "shares per pre-event share", "applied_factor": "shares per pre-event share",
+                    "observed_gap": "ratio (prev close / ex-date open)", "cash_per_share": "INR/share"}
+
+
+def actions_output(log: list[dict], ca_url: str | None) -> list[dict]:
+    """Corporate-action log with every number wrapped in provenance."""
+    out = []
+    for a in log:
+        rec = dict(a)
+        for k, unit in CA_NUMBER_FIELDS.items():
+            if k not in rec:
+                continue
+            if k == "observed_gap":
+                rec[k] = num(rec[k], unit, as_of=a["ex_date"], source=f"computed from {SOURCE}", notes="previous close / ex-date open, unadjusted")
+            elif k == "applied_factor":
+                rec[k] = num(rec[k], unit, as_of=a["ex_date"], source=a.get("factor_source") or "not applied")
+            else:
+                rec[k] = num(rec[k], unit, as_of=a["ex_date"], source="parsed from NSE corporate-action subject", source_url=ca_url)
+        out.append(rec)
+    return out
+
+
 def cmd_prices(args) -> dict:
     e = get_entity(args.query)
     end = parse_date(args.to) if args.to else today_ist()
@@ -201,7 +223,7 @@ def cmd_prices(args) -> dict:
     h = history(e, start, end)
     df = h["df"]
     out = {"identity": e.identity(), "source": SOURCE, "trust": "high (exchange primary)", "source_urls": h["urls"][-3:],
-           "corporate_actions_source": h["ca_url"], "corporate_actions": h["actions"], "warnings": h["warnings"]}
+           "corporate_actions_source": h["ca_url"], "corporate_actions": actions_output(h["actions"], h["ca_url"]), "warnings": h["warnings"]}
     if df.empty:
         out["last"] = None
         return out

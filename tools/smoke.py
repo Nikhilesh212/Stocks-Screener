@@ -32,13 +32,15 @@ def _note(cmd: str, out: dict) -> str:
     if "error" in out:
         return out["error"][:140]
     if cmd == "prices":
-        acts = [a for a in out.get("corporate_actions", []) if a.get("applied_factor")]
-        checks = ", ".join(f"{a['ex_date']} {a['kind']} x{a['applied_factor']:.3g} [{a['check']}]" for a in acts) or "no share-count events"
+        acts = [a for a in out.get("corporate_actions", []) if (a.get("applied_factor") or {}).get("value")]
+        checks = ", ".join(f"{a['ex_date']} {a['kind']} x{a['applied_factor']['value']:.3g} [{a['check']}]" for a in acts) or "no share-count events"
         return f"{out.get('n_rows')} rows to {out.get('range', {}).get('to')}; {checks}; xcheck flag={out.get('crosscheck_last_close', {}).get('flag')}"
     if cmd == "financials":
         q = out.get("quarterly", {})
         flags = [r for r in out.get("crosschecks", {}).get("rows", []) if r[-1]]
-        return f"{len(q.get('rows', []))} quarters, latest {q.get('rows', [[None]])[0][0] if q.get('rows') else None}; bank_format={out.get('is_bank_format')}; crosscheck flags={len(flags)}"
+        cov = out.get("coverage") or {}
+        return (f"{len(q.get('rows', []))} quarters, latest {q.get('rows', [[None]])[0][0] if q.get('rows') else None}; bank_format={out.get('is_bank_format')}; "
+                f"crosscheck flags={len(flags)}; missing quarters={cov.get('missing_quarters')}; warnings={len(out.get('warnings', []))}")
     if cmd == "shareholding":
         rows = out.get("shareholding", {}).get("rows", [])
         return f"{len(rows)} quarters; latest {rows[0][0] if rows else None}"
@@ -79,7 +81,9 @@ def cmd_smoke(args) -> dict:
     ]
     for name, argv in market:
         status, out, secs = _run(parser, argv)
-        note = out.get("error") or json.dumps(out.get("part_status") or out.get("warnings") or "")[:140]
+        note = out.get("error") or (json.dumps(out.get("part_status") or out.get("warnings"))[:140] if (out.get("part_status") or out.get("warnings")) else "")
+        if not note and isinstance(out.get("data"), dict):
+            note = f"{len(out['data'].get('rows', []))} rows as of {out.get('date') or out['data'].get('as_of')}"
         if name.startswith("macro") and status == "ok":
             cpi = out.get("inflation", {})
             note = f"RBI ok={'policy_repo_rate' in out.get('rbi', {})}; flows ok={'fii_fpi_net' in out.get('flows', {})}; CPI={'unavailable' if 'cpi_yoy' in cpi else 'responded'}"

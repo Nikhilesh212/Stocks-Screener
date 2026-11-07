@@ -153,7 +153,8 @@ def is_provenance_number(obj: Any) -> bool:
 
 # Integer bookkeeping fields (page numbers, counts of rows/pages) are metadata,
 # not financial figures, and may appear bare.
-META_INT_KEYS = {"page", "pages_hit", "n_pages", "n_chars", "near_empty_pages", "n_rows", "n_items", "total_count"}
+META_INT_KEYS = {"page", "pages_hit", "n_pages", "n_chars", "near_empty_pages", "n_rows", "n_items", "total_count",
+                 "requested_quarters", "returned_quarters", "n_picks", "n_records"}
 
 
 def find_bare_numbers(obj: Any, path: str = "$") -> list[str]:

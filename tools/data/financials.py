@@ -18,7 +18,7 @@ from collections import defaultdict
 from ..common.cache import fetch
 from ..common.entity import Entity, get_entity, same_issuer_equity
 from ..common.http import SourceError
-from ..common.periods import fy_label, months_between, parse_date, period_label
+from ..common.periods import fy_label, months_between, parse_date, period_label, quarter_end_dates, quarter_label
 from ..common.provenance import table, today_ist
 from ..common.sources import TTL_LIST, nse_api
 from ..common.units import CRORE, INR_CR
@@ -63,6 +63,7 @@ BANK = {
     "operating_profit_pre_provision": ["OperatingProfitBeforeProvisionAndContingencies"],
     "provisions": ["ProvisionsOtherThanTaxAndContingencies"], "exceptional_items": ["ExceptionalItems"],
     "pbt": ["ProfitLossFromOrdinaryActivitiesBeforeTax"], "tax": ["TaxExpense"], "pat": ["ProfitLossForThePeriod"],
+    "minority_interest": ["ProfitLossOfMinorityInterest"],
     "pat_owners": ["ProfitLossAfterTaxesMinorityInterestAndShareOfProfitLossOfAssociates"],
     "eps_basic": ["BasicEarningsPerShareAfterExtraordinaryItems"], "eps_diluted": ["DilutedEarningsPerShareAfterExtraordinaryItems"],
     "paid_up_capital": ["PaidUpValueOfEquityShareCapital"], "face_value": ["FaceValueOfEquityShareCapital"],
@@ -158,8 +159,46 @@ def _extract(inst: xbrl.Instance, mapping: dict) -> list[tuple[str, str, dt.date
     return out
 
 
+def _crosscheck_note(values: dict, item: str, fy: str, qs: list[str], minority_item: str, rev_item: str) -> str:
+    """Best explanation we can give for a quarter-sum mismatch, from the filed values themselves."""
+    notes = []
+    rev_ok = (fy, rev_item) in values and all((q, rev_item) in values for q in qs) and values[(fy, rev_item)][0] and \
+        abs(sum(values[(q, rev_item)][0] for q in qs) / values[(fy, rev_item)][0] - 1) <= CROSSCHECK_TOL
+    if rev_ok:
+        notes.append(f"{rev_item} reconciles, so period parsing is consistent")
+    if item in ("pat", "pat_owners"):
+        mi = {q: values[(q, minority_item)][0] for q in qs + [fy] if (q, minority_item) in values}
+        zero = sorted(k for k, v in mi.items() if v == 0)
+        nonzero = sorted(k for k, v in mi.items() if v)
+        same = sorted(q for q in qs + [fy] if (q, "pat") in values and (q, "pat_owners") in values and values[(q, "pat")][0] == values[(q, "pat_owners")][0])
+        if zero and nonzero:
+            notes.append(f"filer reports minority interest as 0 in {zero} but non-zero in {nonzero}; in the zero filings pat equals pat_owners "
+                         f"({same}), i.e. pat is tagged after minority interest there. Filer tagging inconsistency, not a parse error: compare pat_owners")
+        elif not notes:
+            notes.append("cause not identified from XBRL; check the results PDF (restatement, discontinued operation or scheme of arrangement)")
+    return "; ".join(notes) or "cause not identified from XBRL; check the results PDF"
+
+
+def _coverage(quarterly: dict, requested: int, filings: list[dict], other_basis_ends: set) -> dict:
+    """Which of the requested quarters are missing, and whether the other basis has them."""
+    got = {r[0] for r in quarterly["rows"]}
+    if not quarterly["rows"]:
+        return {"requested_quarters": requested, "returned_quarters": 0, "missing_quarters": [], "missing_available_in_other_basis": []}
+    latest = max(dt.date.fromisoformat(r[1]) for r in quarterly["rows"])
+    expected = quarter_end_dates(latest, requested)
+    missing = [d for d in expected if quarter_label(d) not in got]
+    listed = {f["period_end"] for f in filings}
+    return {"requested_quarters": requested, "returned_quarters": len(got),
+            "missing_quarters": [quarter_label(d) for d in missing],
+            "missing_not_in_filing_list": [quarter_label(d) for d in missing if d not in listed],
+            "missing_available_in_other_basis": [quarter_label(d) for d in missing if d in other_basis_ends],
+            "note": ("bases are never mixed in one table; fetch the other basis separately if a gap matters" if missing else None)}
+
+
 def statements(e: Entity, basis: str, quarters: int, years: int) -> dict:
     filings, warns = list_filings(e, basis)
+    # same cached list responses, so this costs no extra requests
+    other_basis_ends = {f["period_end"] for f in list_filings(e, "standalone" if basis == "consolidated" else "consolidated")[0]}
     if not filings:
         return {"warnings": warns + [f"no {basis} Ind AS XBRL filings found"], "filings_used": []}
     ends = sorted({f["period_end"] for f in filings}, reverse=True)
@@ -224,19 +263,23 @@ def statements(e: Entity, basis: str, quarters: int, years: int) -> dict:
 
     checks = []
     rev_item = "interest_earned" if is_bank else "revenue"
+    minority_item = "minority_interest" if is_bank else "pat_minority"
     for fy_end in fy_ends:
         fy = fy_label(fy_end)
         qs = [f"Q{n}{fy}" for n in (1, 2, 3, 4)]
-        for item in (rev_item, "pat"):
+        for item in (rev_item, "pat", "pat_owners"):
             if (fy, item) in values and all((q, item) in values for q in qs):
                 total = sum(values[(q, item)][0] for q in qs)
                 annual_v = values[(fy, item)][0]
                 diff = abs(total / annual_v - 1) if annual_v else None
+                flag = diff is None or diff > CROSSCHECK_TOL
                 checks.append({"check": f"sum of quarters vs annual {item} {fy}", "sum_quarters": total, "annual": annual_v, "unit": INR_CR,
-                               "diff_pct": None if diff is None else round(diff * 100, 3), "flag": diff is None or diff > CROSSCHECK_TOL})
+                               "diff_pct": None if diff is None else round(diff * 100, 3), "flag": flag,
+                               "note": _crosscheck_note(values, item, fy, qs, minority_item, rev_item) if flag else None})
     return {"is_bank_format": is_bank, "quarterly": quarterly, "annual": annual, "half_year": half, "balance_sheet": bs,
-            "crosschecks": {"kind": "table", "columns": ["check", "sum_quarters", "annual", "unit", "diff_pct", "flag"], "units": {"sum_quarters": INR_CR, "annual": INR_CR, "diff_pct": "%"},
-                            "rows": [[c["check"], c["sum_quarters"], c["annual"], c["unit"], c["diff_pct"], c["flag"]] for c in checks],
+            "coverage": _coverage(quarterly, quarters, filings, other_basis_ends),
+            "crosschecks": {"kind": "table", "columns": ["check", "sum_quarters", "annual", "unit", "diff_pct", "flag", "note"], "units": {"sum_quarters": INR_CR, "annual": INR_CR, "diff_pct": "%"},
+                            "rows": [[c["check"], c["sum_quarters"], c["annual"], c["unit"], c["diff_pct"], c["flag"], c["note"]] for c in checks],
                             "source": "computed from the tables above", "retrieved_at": quarterly["retrieved_at"]},
             "restatements_or_conflicts": {"kind": "table", "columns": ["period", "item", "kept", "other", "kept_source", "other_source"], "units": {"kept": "as item", "other": "as item"},
                                           "rows": [[c[k] for k in ("period", "item", "kept", "other", "kept_source", "other_source")] for c in conflicts],
