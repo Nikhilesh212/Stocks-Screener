@@ -15,6 +15,7 @@ from dotenv import load_dotenv
 
 from .common.cache import REPO_ROOT, settings
 from .common.entity import ResolutionError
+from .common.errors import InputError
 from .common.http import SourceError
 from .common.provenance import now_iso
 
@@ -80,6 +81,9 @@ def main(argv: list[str] | None = None) -> int:
         code = 2
     except FileNotFoundError as e:
         out.update({"status": "missing_input", "error": str(e)})
+        code = 2
+    except InputError as e:
+        out.update({"status": "input_error", "error": str(e)})
         code = 2
     text = json.dumps(out, indent=1, ensure_ascii=False, default=str)
     if getattr(args, "out", None):
