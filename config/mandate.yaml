@@ -1,0 +1,20 @@
+# Research mandate. Confirm or change per run in Phase 0 of the equity-research skill.
+# Values marked "DEFAULT - confirm" were not set by the user (Phase A answer: use all defaults, 2026-11-08).
+horizon_months: 12            # DEFAULT - confirm. >= 12 also qualifies listed equity for long-term capital gains treatment
+benchmark: NIFTY 500 TRI
+capital_inr: null             # DEFAULT - confirm. optional; used only for liquidity and cost estimates
+min_positions: 0              # zero is allowed: "buy the index" or "hold cash" are valid outcomes
+max_positions: 10             # DEFAULT - confirm
+max_weight: 0.15              # DEFAULT - confirm
+max_sector_weight: 0.35       # DEFAULT - confirm
+max_drawdown_tolerance: 0.25  # DEFAULT - confirm. portfolio-level tolerance the user is prepared to sit through
+liquidity:
+  min_adv_inr_crore: 5        # DEFAULT - confirm
+  max_days_to_exit: 3         # DEFAULT - confirm
+  participation_rate: 0.15    # DEFAULT - confirm
+universe: NSE main board      # SME platform excluded by default
+exclusions: []                # DEFAULT - confirm. sectors or companies the user doesn't want
+include_themes: []            # DEFAULT - confirm
+avoid_themes: []              # DEFAULT - confirm
+allow_cash: true
+instruments: equity_cash_only # no F&O, no leverage, no shorting

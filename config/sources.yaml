@@ -1,0 +1,88 @@
+# Data sources, priority order, verified status. Updated by hand after `python -m tools smoke`.
+# Status values: ok | blocked | unavailable | needs_credentials | not_used
+# Policy: honest User-Agent naming this tool, per-host rate limits, robots.txt respected,
+# no header/cookie tricks, no CAPTCHA handling. A 401/403 marks a source blocked.
+verified_on: 2026-11-08
+user_agent: "equity-research-tool/0.1 (personal non-commercial research)"  # override: ER_USER_AGENT in .env
+
+sources:
+  - name: NSE archives (nsearchives.nseindia.com)
+    provides: [EQUITY_L master, SME master, index constituent CSVs, full bhavcopy with delivery %, ind_close_all (all index closes + P/E, P/B, DY)]
+    used_by: [resolve, prices bhavcopy/crosscheck, index snapshot]
+    status: ok
+    notes: Plain GET. robots.txt not published (404 page). Past-dated files cached forever.
+
+  - name: NSE website API (www.nseindia.com/api)
+    provides: [security-wise price/volume/delivery history, corporate actions, announcements, annual reports, results lists (legacy + integrated filing), shareholding list, event calendar, ASM/GSM lists, FII/DII provisional, credit ratings, index price history]
+    used_by: [prices, filings, financials, shareholding, events, macro flows, index]
+    status: ok
+    notes: >
+      Works without cookies with the honest UA (robots.txt: Allow /). The homepage and quote-equity
+      endpoints return 403 and are NOT used. Quirks: historical price endpoint returns only the latest
+      ~70 rows of a range (tool uses 90-day chunks and errors on truncation); reported previous close is
+      NOT adjusted on bonus/split ex-dates (verified RELIANCE 28-Oct-2024); corporate-credit-rating
+      returns market-wide recent rows (filtered by symbol, often empty).
+
+  - name: niftyindices.com BackPage endpoints
+    provides: [Total Return Index history, P/E-P/B-DY history]
+    used_by: [index history]
+    status: ok
+    notes: >
+      POST /BackPage/getTotalReturnIndexString and /BackPage/getpepbHistoricaldataDBtoString with JSON
+      {"cinfo": "{'name':..,'startDate':'dd-Mon-yyyy','endDate':..,'indexName':..}"}; <= 1 year per call
+      (site's own limit). Paths taken from the site's public JS. An earlier wrong path (/Backpage.aspx/...)
+      returned 302; retrying it with extra headers was blocked as bot-check circumvention and abandoned.
+
+  - name: NSE XBRL filings (nsearchives /corporate/xbrl/)
+    provides: [quarterly/annual P&L, H1/FY balance sheet and cash flow, bank-format statements, shareholding pattern detail]
+    used_by: [financials, shareholding]
+    status: ok
+    notes: >
+      Values are absolute rupees (converted to INR crore in code). Legacy (pre-2025) filings mislabel the
+      YTD "FourD" context with quarter dates; parser uses DateOfStart/EndOfReportingPeriod facts.
+      Pre-Ind-AS (before ~FY17) taxonomy not parsed.
+
+  - name: BSE equity bhavcopy (www.bseindia.com/download/BhavCopy/Equity/)
+    provides: [ISIN -> BSE scrip code]
+    used_by: [resolve]
+    status: ok
+    notes: Plain public download.
+
+  - name: BSE API (api.bseindia.com)
+    provides: [announcements, results]
+    status: blocked
+    notes: Akamai "Access Denied" (403) even for robots.txt. Not used; NSE covers the same filings.
+
+  - name: RBI homepage (www.rbi.org.in)
+    provides: [policy repo, SDF, MSF, CRR, SLR, INR reference rates, G-sec yields with as-on date, call money]
+    used_by: [macro]
+    status: ok
+    notes: Snapshot only (no history); effective dates of rate changes must be cited from RBI press releases.
+
+  - name: MOSPI API (api.mospi.gov.in)
+    provides: [CPI]
+    status: unavailable
+    notes: Connection timed out from this machine on 2026-11-08. Runs cite dated MOSPI press releases via WebSearch.
+
+  - name: FRED (fred.stlouisfed.org)
+    provides: [macro fallback incl. INR/USD, Brent, India yields]
+    status: unavailable
+    notes: Connection timed out from this machine on 2026-11-08 (network path, not a block).
+
+  - name: NSDL FPI reports (www.fpi.nsdl.co.in)
+    provides: [final FPI flows]
+    status: not_used
+    notes: Reachable (200). Not parsed yet; NSE provisional flows used.
+
+  - name: Yahoo Finance via yfinance (optional extra `yahoo`)
+    provides: [price fallback]
+    status: not_used
+    notes: Lower trust; returned 429 then 200 on 2026-11-08. Not needed while NSE works.
+
+  - name: Broker API
+    status: not_used
+    notes: User chose no broker. Never use order scopes.
+
+  - name: Screener.in
+    status: not_used
+    notes: User has no account to use. Not scraped.
