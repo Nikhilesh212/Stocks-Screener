@@ -173,3 +173,17 @@ def test_review_window_and_corrections(frozen):
     assert aaa["kill_criteria"] == ["margin below 8%"] and aaa["corrections"][0]["reason"] == "typo at freeze"
     raw = [json.loads(x) for x in (ldir / "picks.jsonl").read_text().splitlines()]
     assert next(r for r in raw if r["record_id"] == "run1:INEAAA01010")["kill_criteria"] == ["margin below 10%"]  # original untouched
+
+
+def test_discover_cohorts_reads_run_files(tmp_path):
+    """B from dossiers (conviction files never read), C from red-team "killed", D from candidates."""
+    (tmp_path / "dossiers").mkdir()
+    (tmp_path / "redteam").mkdir()
+    for s in ("AAA", "BBB"):
+        (tmp_path / "dossiers" / f"{s}.json").write_text(json.dumps({"identity": {"isin": f"INE{s}01010", "nse_symbol": s}}))
+    (tmp_path / "dossiers" / "ZZZ.conviction.json").write_text(json.dumps({"symbol": "ZZZ", "p_beat_benchmark": 0.6}))
+    (tmp_path / "redteam" / "AAA.json").write_text(json.dumps({"identity": {"nse_symbol": "AAA"}, "verdict": "killed"}))
+    (tmp_path / "redteam" / "BBB.json").write_text(json.dumps({"identity": {"nse_symbol": "BBB"}, "verdict": "weakened"}))
+    (tmp_path / "candidates.json").write_text(json.dumps({"candidates": [{"symbol": "AAA"}, {"symbol": "bbb"}, {"symbol": "CCC"}]}))
+    cohorts, notes = freeze.discover_cohorts(tmp_path)
+    assert cohorts == {"B": ["AAA", "BBB"], "C": ["AAA"], "D": ["AAA", "BBB", "CCC"]} and notes == []

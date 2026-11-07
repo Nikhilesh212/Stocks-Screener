@@ -403,8 +403,12 @@ def test_every_cli_help_renders():
     from tools.cli import build_parser
     parser = build_parser()
     groups = next(a for a in parser._actions if a.dest == "group").choices
-    for name in ("compute", "ledger"):
-        sub = next(a for a in groups[name]._actions if a.dest == "command").choices
-        assert sub, name
-        for cmd, p in sub.items():
-            p.format_help()  # a stray % in a help string raises here
+    assert {"data", "compute", "ledger"} <= set(groups)
+
+    def walk(p):
+        p.format_help()  # a stray % in a help string (here or in a child's help) raises
+        for a in p._actions:
+            if isinstance(a.choices, dict):
+                for child in a.choices.values():
+                    walk(child)
+    walk(parser)

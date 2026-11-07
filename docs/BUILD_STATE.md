@@ -12,7 +12,7 @@ Update this file and commit at the end of every phase.
 | B | Docs + plan | done 2026-11-08: plan approved with defaults (below) |
 | C | Data layer + smoke | done 2026-11-08 (fixture tests added in Session D1) |
 | D | Compute + ledger + tests + costs.yaml | done 2026-11-08 (Sessions D1, D2): 63 tests green |
-| E | References, 4 agents, SKILL.md, CLAUDE.md, README, settings.json, hooks | **next**: start from "Session E" below |
+| E | References, 4 agents, SKILL.md, CLAUDE.md, README, settings.json, hooks | E1 done 2026-11-08 (references, hooks + tests, settings.json); **E2 next**: start from "Session E2 brief" below |
 | F | Dry run (needs Claude Code restart first) | not started |
 | G | Hand-over | not started |
 
@@ -135,19 +135,81 @@ Design notes (for Session E's `output-schemas.md`):
 - Reverse DCF: CF0 per share (FCF/share or TTM EPS from cache, or `--price/--base-value`); N years at g, F fade years with growth linear to gt, Gordon terminal; bisection on [-90%, 200%]; N = F = 0 solves implied terminal growth instead. Grids: ke x N and ke x gt.
 - costs_tax: per-trade lines; tax gain excludes STT (s.48); LTCG if held more than 12 months; with/without exemption; surcharge capped at 15%; cess on tax + surcharge. Postmortem nets short/long-term results across picks and applies ONE annual exemption at portfolio level.
 - Ledger files: `<ledger-dir>/picks.jsonl` (append-only; records `run`, `pick`, `review`, `postmortem`, `correction`; numbers are provenance numbers), `<ledger-dir>/postmortems/<run_id>.md` (written once; interim ones are `<run_id>.interim-<date>.md`). Record ids: `<run_id>:run`, `<run_id>:<ISIN>`, `<run_id>:review:<date>`, `<run_id>:postmortem[-interim-<date>]`, `<id>:correctionN`.
-- Freeze input `runs/<run_id>/freeze_input.json`: `{model_id, horizon_months?, picks: [{symbol, weight, thesis, scenarios: [{name, probability, return_pct, return_range_pct: [lo|null, hi|null]}], p_beat_benchmark, kill_criteria: [..], review_dates: [YYYY-MM-DD]}], cohorts?: {B: [SYM], C: [SYM], D: [SYM]}}`. Validation: weights > 0 summing <= 1; scenario probabilities sum to 1 +- 0.01; p in [0, 1]; thesis and kill criteria required; zero picks allowed. Cohorts not listed are read from the run folder: B = `dossiers/*.json` (`identity.nse_symbol`/`symbol`), C = `redteam/*.json` with `"verdict": "kill"`, D = `candidates.json` (list, or `{candidates: [...]}`, of symbols or `{symbol}`). **Session E must make the agents write these files in that shape.** Scenario `return_range_pct` is needed for the multi-class scenario Brier score.
+- Freeze input `runs/<run_id>/freeze_input.json`: `{model_id, horizon_months?, picks: [{symbol, weight, thesis, scenarios: [{name, probability, return_pct, return_range_pct: [lo|null, hi|null]}], p_beat_benchmark, kill_criteria: [..], review_dates: [YYYY-MM-DD]}], cohorts?: {B: [SYM], C: [SYM], D: [SYM]}}`. Validation: weights > 0 summing <= 1; scenario probabilities sum to 1 +- 0.01; p in [0, 1]; thesis and kill criteria required; zero picks allowed. Cohorts not listed are read from the run folder: B = `dossiers/*.json` (`identity.nse_symbol`/`symbol`), C = `redteam/*.json` with `"verdict": "killed"` (E1; `"kill"` also accepted), D = `candidates.json` (list, or `{candidates: [...]}`, of symbols or `{symbol}`). **Session E must make the agents write these files in that shape.** Scenario `return_range_pct` is needed for the multi-class scenario Brier score.
 - Entry = close of the first session after the freeze date; returns are TR (dividends reinvested); cohort A cash earns 0; B/C/D equal-weight buy-and-hold; members without prices are excluded from the mean and named (survivorship risk). `freeze` requires `--approved "<who/when>"`. Capital: mandate `capital_inr`, else notional INR 10 lakh (labelled).
 
 Cost and tax sources (verified 2026-11-08; full notes in `docs/costs_research_2026-11-08.md`): STT 0.1% each side (NSE/FATAX/73524), NSE txn INR 307/crore incl. IPFT (NSE/FA/73061), BSE INR 375/crore (BSE equity master circular Apr-2026), SEBI INR 10/crore (NSE investor page), stamp 0.015% buy (NSE), GST 18% on brokerage + exchange + SEBI fee (SEBI circular 18-Jul-2022), CDSL INR 3.50 / NSDL INR 4.00 per debit, STCG 20% s.111A / s.196 (2025 Act), LTCG 12.5% above INR 1.25 lakh s.112A / s.198, holding > 12 months s.2(42A) / s.2(101)(b), cess 4%, surcharge cap 15% (Budget memo), 87A/s.156 not against 111A/112A, dividend TDS 10% above INR 10,000 s.194 / s.393. Budget 2026 changed STT on F&O only.
 
-### Session E: agents, skill, references, docs (start here)
-Write the 5 references, 4 agent definitions (opus, effort high, Agent tool blocked, hooks), SKILL.md (§3 nearly verbatim; modes; phases; <500 lines), hooks scripts, `.claude/settings.json`, CLAUDE.md (short), README.md. Re-read each agent as if it had no other context. Update this file. Commit. Then the user restarts Claude Code.
+### Session E (split by the user into E1 and E2, run in series)
+Original plan, kept for reference; E1 did the references, hooks and settings.json (see below). Write the 5 references, 4 agent definitions (opus, effort high, Agent tool blocked, hooks), SKILL.md (§3 nearly verbatim; modes; phases; <500 lines), hooks scripts, `.claude/settings.json`, CLAUDE.md (short), README.md. Re-read each agent as if it had no other context. Update this file. Commit. Then the user restarts Claude Code.
 Carry over from Phase D:
 - `output-schemas.md` must define `freeze_input.json`, `dossiers/*.json` (with `identity`), `redteam/*.json` (with `verdict`: kill/pass/...), `candidates.json` exactly as in "Session D2 results", plus the ledger record types. Agents write those files; the ledger reads them.
 - Teach agents the command order: `data prices SYM --years 10` (and for each peer) before `compute valuation`; `data financials` before `ratios`; `compute calc` for any arithmetic; quote `warnings` from compute outputs (unadjusted price gaps) instead of ignoring them.
 - `ledger freeze` needs `--approved`; the SKILL must run it only after the user's explicit approval in chat and pass the approval text. Dry runs use `--ledger-dir ledger/test` (gitignored).
 - Bank analysts: run `ratios --basis standalone` for asset quality; NIM/CASA/credit cost come from presentations with page cites.
 - Tell the user the cost DEFAULTs (brokerage, DP charge) in `config/costs.yaml` need confirming once a broker is chosen, and re-verify rates after each Budget.
+
+### Session E1 results (2026-11-08)
+Built: `.claude/skills/equity-research/references/` (5 files), `.claude/hooks/` (3 guards + `_guard_common.py`), `.claude/settings.json`, `tests/test_hooks.py` (100 cases). Also fixed: `data --help` crashed (stray `%` in the `prices` help; `tests/test_compute.py::test_every_cli_help_renders` now walks every subcommand, including nested `data index ...` and `data filings ...`); ledger cohort discovery now treats red-team verdict `killed` (spec wording; `kill` still accepted) as cohort C and skips `*.conviction.json` when reading `dossiers/*.json` for cohort B (`tests/test_ledger.py::test_discover_cohorts_reads_run_files`).
+
+### Session E2 brief (start here)
+Write the 4 agent definitions (`.claude/agents/{market-strategist,hunter,company-analyst,red-team}.md`), `.claude/skills/equity-research/SKILL.md`, `CLAUDE.md` and `README.md` on top of what E1 built. Re-read each agent as if it had no other context. Update this file, `uv run pytest`, commit. Then the user restarts Claude Code (new agents, skill and hooks load only after a restart; project hooks also need workspace trust).
+
+**Reference files** (`.claude/skills/equity-research/references/`, written for subagents with no other context; point each agent at the ones it needs, by path):
+- `failure-modes.md`: the 10 CNMV failure modes, each with countermeasures tied to real commands (resolve/ISIN echo, provenance, fiscal notation, XBRL over PDFs, units, `compute calc`, carryover, re-fetch on correction, reading log, citations), plus India/tool traps (unadjusted-gap `warnings`, 10y prices before valuation, short XBRL history, peers' cache, sources down, dated news). All agents.
+- `red-flags-india.md`: 17 required flags plus 8 extra checks; for each, why, the exact command/document search, and pass/flag/unknown guidance (judgment, not a score); row format for dossier section 6. Analyst, red team.
+- `valuation-guide.md`: command order; what `compute valuation` returns; sector methods (banks P/B vs ROE with implied-ROE formula, insurers P/EV/VNB from presentations, cyclicals mid-cycle, holdcos SOTP, platforms unit economics, others); reverse DCF step by step (base choice, ke from `data macro` + stated ERP, grids, `what_has_to_go_right`, `--years 0 --fade 0` returns `implied_terminal_growth`); scenario returns and tiled ranges. Analyst, red team, hunter.
+- `output-schemas.md`: the run-folder table (path, writer, reader), citation and number conventions, `ProvNum`/`Identity` defs, templates and JSON schemas for market_view, hunters/<lens>, candidates.json + shortlist.md, dossier .md (15 sections + reading log + corrections log) / .json / .conviction.json, redteam .md/.json, round-2 archiving, portfolio_holdings.json + portfolio.md, final_report.md, freeze_input.json (matches the ledger validator), reviews/<date>.md, ledger record types. Everyone.
+- `evaluation.md`: §3 objective verbatim, why only forward evaluation is valid, the ledger commands, entry/returns/costs rules, cohorts A-E and how to read them, Brier (p_beat and multi-class scenario), calibration table, how to set probabilities, review and post-mortem practice. Analyst (conviction), main session.
+
+**Hook command lines for each agent's frontmatter** (exactly these; matchers as shown; every agent also needs `disallowedTools: Agent`):
+
+```yaml
+# market-strategist
+hooks:
+  PreToolUse:
+    - matcher: "Write|Edit|MultiEdit|NotebookEdit"
+      hooks:
+        - type: command
+          command: 'python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/guard_writes.py" market_view.md market/'
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: 'python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/guard_bash.py" market_view.md market/'
+```
+- hunter: same two hooks with argument `hunters/` (instead of `market_view.md market/`).
+- company-analyst: same two hooks with argument `dossiers/`.
+- red-team: same two hooks with argument `redteam/`, plus a third:
+```yaml
+    - matcher: "Read|Grep|Glob|Bash"
+      hooks:
+        - type: command
+          command: 'python3 "$CLAUDE_PROJECT_DIR/.claude/hooks/guard_conviction.py"'
+```
+
+What the hooks enforce (tell each agent, so it does not waste turns on blocked calls):
+- `guard_writes.py <spec>...`: Write/Edit/MultiEdit/NotebookEdit only under `runs/<run_id>/<spec>`; a spec ending in `/` is a folder subtree, otherwise one exact file. `run_id` must match `YYYY-MM-DD-<slug>` and **the run folder must already exist**, so the main session creates `runs/<run_id>/` in Phase 0 before spawning anyone (the Write tool creates subfolders itself). Symlinks and `..` are resolved before the check.
+- `guard_bash.py <spec>...`: allows `uv run python -m tools data|compute ...` (exact prefix; `ledger` and `smoke` are refused for subagents; a `--out` path, including argparse prefixes `--o`/`--ou`, must be inside the agent's area) and read-only commands: ls cat head tail wc grep egrep fgrep rg find sort uniq cut tr column nl stat du pwd basename dirname realpath readlink diff cmp comm jq echo printf true date file cd, joined by `| && || ;`. Refused: other commands (sed, awk, xargs, python, curl, cp, mv, rm, tee...), redirection except `2>&1` / `>/dev/null`, `$(...)`, backticks, `$VAR`, `$'...'`, subshells, `&`, here-docs, `NAME=value cmd`, `.env`, and file-writing options (find -exec/-delete, sort -o, uniq OUT, rg --pre, date -s, file -C).
+- `guard_conviction.py`: blocks Read of any `*.conviction.json` (also via symlink); Grep/Glob whose path and glob could include one (`glob: "*.md"` or a non-json `type` is fine); Bash that names one after quote removal and brace/glob expansion, or that reads a folder holding one (`grep -r`, `rg`, `cat dir/*`, `jq dir`, `find -exec`). Listing (`ls`, `find` without exec, `du`, `stat`) is allowed.
+- All three read hook JSON from stdin, exit 2 with a reason on stderr to block, and fail closed (any internal error blocks). Standard library only, Python 3.8+ (`python3` is the pyenv shim: 3.12 in the repo, 3.9 elsewhere; both tested). If `$CLAUDE_PROJECT_DIR` were unset, python could not open the script and exits 2, which blocks every call: also fail-closed, but confusing. **E2: confirm in the hooks docs that `CLAUDE_PROJECT_DIR` is set for frontmatter hooks; Session F should check that one out-of-area write is really blocked.**
+
+**Decisions made in E1** (E2 should follow them; tell the user in hand-over):
+1. Red-team verdict values are the spec's `survives | weakened | killed`; only `killed` puts a name in cohort C. A red-team JSON also has `send_back` (material numerical discrepancies) and `round` (1 or 2).
+2. Probabilities, expected value, `p_beat_benchmark` and confidence live **only** in `dossiers/<SYM>.conviction.json`. The dossier .md/.json carry scenario drivers, returns and ranges but no probabilities (spec §6.3 section 11 lists probabilities in the dossier; that would leak them to the red team).
+3. Scenario `return_pct` is the gross total return over the horizon (what the ledger scores); `return_range_pct` must tile the number line, bear `[null, x)`, base `[x, y)`, bull `[y, null]`, or the scenario Brier score is skipped.
+4. In run JSON files, facts are provenance objects copied from tool output; judgments (returns, probabilities, weights) are plain numbers.
+5. Run-folder additions beyond the spec: `mandate.yaml` (confirmed mandate), `market/` (strategist working files), `hunters/<lens_slug>.md/.json`, `dossiers/work/<SYM>/`, `redteam/work/<SYM>/`, `dossiers/round1/` + `redteam/round1/` (main session copies round-1 files there before a re-analysis; top-level files are always the latest), `portfolio_holdings.json`, `reviews/<date>.md`. `market_view.md` stays at the run root (spec path) via the exact-file spec.
+6. Dossier JSON `kill_criteria` are objects `{criterion, observe, by}`; the main session turns each into the string `'<criterion> (observe: <source>; by <YYYY-MM-DD>)'` for `freeze_input.json`.
+7. The main session has no hooks; it is bounded by the settings allowlist and by SKILL.md.
+
+**Things E2 must handle in the agent/skill text:**
+- Agent `tools:` Read, Grep, Glob, Bash, WebSearch, WebFetch, Write, Edit; `model: opus`, `effort: high`; `disallowedTools: Agent`.
+- `.claude/settings.json` allows only `Bash(uv run python -m tools *)`, `WebSearch`, `WebFetch`, `Edit(runs/**)`. Read-only Bash (ls, cat, grep) is not pre-approved, so subagent use of it raises permission prompts in the main session: tell agents to prefer the Read/Grep/Glob tools for files. Check in Session F that `Edit(runs/**)` (relative path) matches writes when Claude Code runs from the repo root.
+- Hunters have no universe-wide fundamentals screener. Search aids: `data index constituents NAME`, `data index snapshot` (sector P/E etc.), `data bhavcopy --date D [--symbols]` (cross-section of closes/turnover/delivery), web search, then per-name `compute valuation/technicals/ratios`. They choose the parameters; screens never gate.
+- The analyst passes `--out runs/<run_id>/dossiers/work/<SYM>/...` when saving tool output (e.g. for `compute ratios --input`), never a path elsewhere.
+- Spawn prompts pass only: company (symbol), run_id, mandate path, market-view path (and, for round 2, the discrepancy list). Never the hoped-for answer.
+
+**Follow-ups to offer the user (not done, need approval):** a `permissions.deny` rule for `Read(.env)` (guard_bash already blocks `.env` in Bash; the Read tool is unguarded); whether subagents may run `ledger mark` (read-only) during reviews (currently blocked with the whole `ledger` group).
 
 ### Session F: dry run
 One lens, three companies, red team on all, portfolio step; `runs/<date>-dryrun/`; freeze only to `ledger/test/`. Report what worked, failure modes caught, shallowness, time/usage, fixes.

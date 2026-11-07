@@ -10,8 +10,9 @@ Input: `runs/<run_id>/freeze_input.json` (or --input):
                 "kill_criteria": ["..."], "review_dates": ["2027-02-15"]}],
      "cohorts": {"B": ["SYM", ...], "C": [...], "D": [...]}}   # optional; else read from the run folder
 
-Cohorts not listed are read from the run folder: B = every `dossiers/*.json`,
-C = `redteam/*.json` whose verdict is "kill", D = `candidates.json`. A = the
+Cohorts not listed are read from the run folder: B = every `dossiers/<SYM>.json`
+(conviction files skipped), C = `redteam/*.json` whose verdict is "killed" (or
+"kill"), D = `candidates.json`. A = the
 picks as weighted (cash = 1 - sum of weights); E = Nifty 500 TRI.
 Entry is the close of the first trading session after the freeze date; the
 price shown at freeze is a reference only.
@@ -40,6 +41,7 @@ COHORT_TEXT = {
     "D": "equal weight of the hunters' full candidate list",
     "E": f"{BENCHMARK} TRI",
 }
+KILL_VERDICTS = {"killed", "kill"}  # red-team verdicts: survives | weakened | killed
 READING = ["B ~ A: portfolio construction adds nothing", "C beats A: the red team is destroying value",
            "D ~ B: the deep dives add nothing", "D ~ E: hunting adds nothing"]
 
@@ -58,11 +60,13 @@ def discover_cohorts(run_dir: Path) -> tuple[dict[str, list[str]], list[str]]:
     out: dict[str, list[str]] = {"B": [], "C": [], "D": []}
     notes = []
     for f in sorted((run_dir / "dossiers").glob("*.json")):
+        if f.name.endswith(".conviction.json"):
+            continue  # probabilities live there, not identity; never read for cohorts
         d = json.loads(f.read_text())
         out["B"] += _syms([d.get("identity", d)])
     for f in sorted((run_dir / "redteam").glob("*.json")):
         d = json.loads(f.read_text())
-        if str(d.get("verdict", "")).lower() == "kill":
+        if str(d.get("verdict", "")).lower() in KILL_VERDICTS:
             out["C"] += _syms([d.get("identity", d)])
     cand = run_dir / "candidates.json"
     if cand.exists():

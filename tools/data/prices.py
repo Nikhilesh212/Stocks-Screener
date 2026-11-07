@@ -278,7 +278,7 @@ def cmd_bhavcopy(args) -> dict:
 
 
 def register(sub, leaf) -> None:
-    p = leaf(sub, "prices", "Daily OHLCV adjusted for bonus/split/rights, delivery %, dividend TR series")
+    p = leaf(sub, "prices", "Daily OHLCV adjusted for bonus/split/rights, delivery percent, dividend TR series")
     p.add_argument("query", help="NSE symbol or ISIN")
     p.add_argument("--from", dest="start", help="YYYY-MM-DD (default: --years back)")
     p.add_argument("--to", help="YYYY-MM-DD (default today)")
