@@ -41,6 +41,7 @@ class Instance:
     contexts: dict[str, Context]
     facts: list[Fact]
     text: dict[str, str] = field(default_factory=dict)  # first non-dimensional text value per name
+    synthesized: list[str] = field(default_factory=list)  # context ids referenced but not defined by the filer
 
     def value(self, name: str, ctx: str) -> str | None:
         for f in self.facts:
@@ -82,10 +83,25 @@ def parse(content: bytes) -> Instance:
         name = etree.QName(el).localname
         raw = (el.text or "").strip()
         facts.append(Fact(name, ctx, el.get("unitRef"), el.get("decimals"), raw))
-        if name not in text and ctx in contexts and not contexts[ctx].dims:
-            text[name] = raw
-    inst = Instance(contexts, facts, text)
+    # Some legacy filings (e.g. RELIANCE FY19-FY21) reference their main contexts (OneD, FourD, OneI) without
+    # defining them. Recreate them as non-dimensional contexts; _fix_periods dates them from the filer's own
+    # DateOfStart/EndOfReportingPeriod facts, and instants take the end date of the matching duration.
+    synthesized = sorted({f.context for f in facts} - set(contexts))
+    for cid in synthesized:
+        contexts[cid] = Context(cid, None, None, cid.endswith("I"), ())
+    for f in facts:
+        if f.name not in text and f.context in contexts and not contexts[f.context].dims:
+            text[f.name] = f.raw
+    inst = Instance(contexts, facts, text, synthesized)
     _fix_periods(inst)
+    for cid in synthesized:
+        c = contexts[cid]
+        if c.instant:
+            dur = contexts.get(cid[:-1] + "D")
+            c.end = dur.end if dur is not None and not dur.instant else None
+        if c.end is None:
+            del contexts[cid]  # cannot date it from the filing itself: drop rather than guess
+    inst.synthesized = [cid for cid in synthesized if cid in contexts]
     return inst
 
 

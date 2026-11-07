@@ -17,7 +17,7 @@ from typing import Any
 from ..common.errors import InputError
 from ..common.provenance import derived, missing, num
 from ..common.units import COUNT, DAYS, INR_CR, PCT, RATIO
-from ._util import cagr, fnum, frame, load_json, records_table, safe_div
+from ._util import cagr, fnum, frame, load_json, records_table, safe_div, share_actions
 
 CORP_FORMULAS = {
     "ebitda": "pbt_before_exceptional + finance_costs + depreciation - other_income (excludes other income)",
@@ -39,7 +39,6 @@ CORP_FORMULAS = {
     "payable_days": "trade_payables_current / cogs * 365",
     "cash_conversion_cycle_days": "receivable_days + inventory_days - payable_days",
     "shares_crore": "paid_up_capital (INR) / face_value / 1e7",
-    "share_count_change_pct": "shares_crore / previous FY shares_crore * 100 - 100 (dilution if > 0)",
 }
 BANK_FORMULAS = {
     "nii": "interest_earned - interest_expended",
@@ -55,15 +54,23 @@ BANK_FORMULAS = {
     "car_filed": "capital adequacy ratio as filed (unit as filed)",
     "cet1_filed": "CET1 ratio as filed (unit as filed)",
 }
+SHARE_FORMULAS = {
+    "share_basis_factor": "product of bonus/split/consolidation factors with ex-date after period_end (same factors as `data prices` adj_factor)",
+    "shares_restated_crore": "shares_crore * share_basis_factor (today's share basis)",
+    "eps_restated": "eps_basic / share_basis_factor (today's share basis; EPS filed after a later bonus/split may already be restated, see notes)",
+    "share_count_change_pct": "shares_restated_crore / previous FY shares_restated_crore * 100 - 100 (issuance/buyback only; > 0 = dilution)",
+}
 CORP_UNITS = {"revenue": INR_CR, "ebitda": INR_CR, "ebit": INR_CR, "pat": INR_CR, "pat_owners": INR_CR, "fcf": INR_CR, "net_debt": INR_CR,
               "ebitda_margin_pct": PCT, "pat_margin_pct": PCT, "other_income_pct_pbt": PCT, "effective_tax_rate_pct": PCT,
               "roe_pct": PCT, "roce_pct": PCT, "debt_equity": RATIO, "interest_coverage": RATIO, "ocf_ebitda": RATIO, "ocf_pat": RATIO,
               "receivable_days": DAYS, "inventory_days": DAYS, "payable_days": DAYS, "cash_conversion_cycle_days": DAYS,
-              "shares_crore": "crore shares", "share_count_change_pct": PCT, "eps_basic": "INR/share"}
+              "shares_crore": "crore shares", "share_basis_factor": "x", "shares_restated_crore": "crore shares",
+              "share_count_change_pct": PCT, "eps_basic": "INR/share", "eps_restated": "INR/share"}
 BANK_UNITS = {"nii": INR_CR, "pat": INR_CR, "pat_owners": INR_CR, "other_income": INR_CR, "nii_to_avg_assets_pct": PCT, "cost_to_income_pct": PCT,
               "provisions_to_avg_advances_pct": PCT, "roa_pct": PCT, "roe_pct": PCT, "pcr_pct": PCT, "credit_deposit_pct": PCT,
               "gnpa_pct_filed": "as filed", "nnpa_pct_filed": "as filed", "car_filed": "as filed", "cet1_filed": "as filed",
-              "shares_crore": "crore shares", "share_count_change_pct": PCT, "eps_basic": "INR/share"}
+              "shares_crore": "crore shares", "share_basis_factor": "x", "shares_restated_crore": "crore shares",
+              "share_count_change_pct": PCT, "eps_basic": "INR/share", "eps_restated": "INR/share"}
 # a bank cannot truly have zero NPAs or zero capital ratio; consolidated filings often carry 0 for "not reported"
 BANK_ZERO_MEANS_MISSING = {"gross_npa", "net_npa", "gnpa_pct", "nnpa_pct", "car", "cet1_ratio"}
 
@@ -96,7 +103,7 @@ def _shares(row: dict) -> float | None:
     return cap / fv / 1e7 if cap and fv else None
 
 
-def corporate_year(pl: dict, bs: dict | None, bs_open: dict | None, prev_pl: dict | None) -> dict:
+def corporate_year(pl: dict, bs: dict | None, bs_open: dict | None) -> dict:
     rec: dict[str, Any] = {"period": pl["period"], "period_end": pl["period_end"]}
     rev, oi, fin, dep = _g(pl, "revenue"), _g(pl, "other_income"), _g(pl, "finance_costs"), _g(pl, "depreciation")
     pbt_be = _g(pl, "pbt_before_exceptional")
@@ -141,13 +148,11 @@ def corporate_year(pl: dict, bs: dict | None, bs_open: dict | None, prev_pl: dic
     rec["payable_days"] = _times(safe_div(_g(bs, "trade_payables_current"), cogs), 365)
     rec["cash_conversion_cycle_days"] = _add(rec["receivable_days"], rec["inventory_days"], -rec["payable_days"] if rec["payable_days"] is not None else None)
     rec["shares_crore"] = _shares(pl)
-    prev_sh = _shares(prev_pl) if prev_pl else None
-    rec["share_count_change_pct"] = _pct(safe_div(rec["shares_crore"], prev_sh), minus_one=True)
     rec["notes"] = "; ".join(notes) or None
     return rec
 
 
-def bank_year(pl: dict, bs: dict | None, bs_open: dict | None, prev_pl: dict | None) -> dict:
+def bank_year(pl: dict, bs: dict | None, bs_open: dict | None) -> dict:
     rec: dict[str, Any] = {"period": pl["period"], "period_end": pl["period_end"]}
     nii = _add(_g(pl, "interest_earned"), -_g(pl, "interest_expended") if _g(pl, "interest_expended") is not None else None)
     oi, pat = _g(pl, "other_income"), _g(pl, "pat")
@@ -172,10 +177,49 @@ def bank_year(pl: dict, bs: dict | None, bs_open: dict | None, prev_pl: dict | N
     rec["gnpa_pct_filed"], rec["nnpa_pct_filed"] = filed["gnpa_pct"], filed["nnpa_pct"]
     rec["car_filed"], rec["cet1_filed"] = filed["car"], filed["cet1_ratio"]
     rec["shares_crore"] = _shares(pl)
-    prev_sh = _shares(prev_pl) if prev_pl else None
-    rec["share_count_change_pct"] = _pct(safe_div(rec["shares_crore"], prev_sh), minus_one=True)
     rec["notes"] = "; ".join(notes) or None
     return rec
+
+
+SHARE_COUNT_KINDS = ("bonus", "split", "consolidation")
+
+
+def share_basis_factor(period_end: str, actions: list) -> float:
+    """Multiplier from a period-end share count to today's basis (bonus 1:1 -> 2, split 10->2 -> 5)."""
+    end = dt.date.fromisoformat(period_end)
+    f = 1.0
+    for a in actions:
+        if a.kind in SHARE_COUNT_KINDS and a.factor and a.ex_date > end:
+            f *= a.factor
+    return f
+
+
+def restate_share_basis(recs: list[dict], actions: list | None) -> list[str]:
+    """Put EPS and share counts on today's share basis so CAGRs and dilution are not distorted by bonuses/splits.
+
+    With no corporate-action list, restated fields stay null and growth falls back to filed EPS only if the share
+    count barely moved. Mutates recs; returns notes.
+    """
+    notes: list[str] = []
+    unparsed = [a for a in (actions or []) if a.kind in SHARE_COUNT_KINDS and not a.factor]
+    if unparsed:
+        notes.append(f"share-count actions without a parsed factor (not restated): {[(a.ex_date.isoformat(), a.subject) for a in unparsed]}")
+    for r in recs:
+        if actions is None:
+            r["share_basis_factor"] = r["shares_restated_crore"] = r["eps_restated"] = None
+            continue
+        f = share_basis_factor(r["period_end"], actions)
+        r["share_basis_factor"] = f
+        r["shares_restated_crore"] = r["shares_crore"] * f if r.get("shares_crore") is not None else None
+        r["eps_restated"] = r["eps_basic"] / f if r.get("eps_basic") is not None else None
+    for prev, cur in zip(recs, recs[1:]):
+        consecutive = int(cur["period"][2:]) == int(prev["period"][2:]) + 1
+        cur["share_count_change_pct"] = _pct(safe_div(cur.get("shares_restated_crore"), prev.get("shares_restated_crore")), minus_one=True) if consecutive else None
+    if recs:
+        recs[0]["share_count_change_pct"] = None
+    if actions is None:
+        notes.append("corporate actions unavailable: EPS/share counts not restated for bonuses/splits; dilution not computed")
+    return notes
 
 
 def _pct(x: float | None, minus_one: bool = False) -> float | None:
@@ -205,11 +249,16 @@ def growth(records: list[dict], items: list[str], spans=(3, 5, 10)) -> dict:
                                              source="computed", period=f"FY{fy_num:02d}-{latest['period']}")
                 continue
             v, why = cagr(start.get(item), latest.get(item), n)
+            if item == "eps_basic" and v is not None:
+                jump = safe_div(latest.get("shares_crore"), start.get("shares_crore"))
+                if jump is not None and abs(jump - 1) > 0.2:
+                    v, why = None, (f"share count changed {jump:.2f}x between {start['period']} and {latest['period']} (bonus/split?): "
+                                    "filed EPS not comparable; use eps_restated")
             out[item][f"{n}y"] = (missing(why, PCT, source="computed") if v is None else
                                   derived(v * 100, PCT, formula=f"({item} {latest['period']} / {item} {start['period']})^(1/{n}) - 1",
-                                          inputs={start["period"]: num(start.get(item), INR_CR if item != "eps_basic" else "INR/share", source="data financials",
+                                          inputs={start["period"]: num(start.get(item), INR_CR if not item.startswith("eps") else "INR/share", source="data financials",
                                                                        period=start["period"]),
-                                                  latest["period"]: num(latest.get(item), INR_CR if item != "eps_basic" else "INR/share", source="data financials",
+                                                  latest["period"]: num(latest.get(item), INR_CR if not item.startswith("eps") else "INR/share", source="data financials",
                                                                         period=latest["period"])},
                                           period=f"{start['period']}-{latest['period']}"))
     return out
@@ -238,8 +287,9 @@ def quarterly_ebitda(row: dict) -> float | None:
     return _add(_g(row, "pbt_before_exceptional"), _g(row, "finance_costs"), _g(row, "depreciation"), -oi if oi is not None else None)
 
 
-def compute(fin: dict, *, contingent_liabilities_cr: float | None = None, contingent_source: str | None = None) -> dict:
-    """All ratios from a `data financials` result."""
+def compute(fin: dict, *, contingent_liabilities_cr: float | None = None, contingent_source: str | None = None,
+            actions: list | None = None) -> dict:
+    """All ratios from a `data financials` result. `actions`: CorpAction list covering the history (None = unknown)."""
     if not fin.get("annual"):
         raise InputError("financials input has no annual table; run `data financials` first")
     is_bank = bool(fin.get("is_bank_format"))
@@ -250,9 +300,9 @@ def compute(fin: dict, *, contingent_liabilities_cr: float | None = None, contin
     for i, pl in enumerate(annual):
         bs = bs_rows.get(pl["period_end"])
         bs_open = bs_rows.get(_prev_year_end(pl["period_end"]))
-        prev = annual[i - 1] if i > 0 and annual[i - 1]["period"] == f"FY{int(pl['period'][2:]) - 1:02d}" else None
-        recs.append((bank_year if is_bank else corporate_year)(pl, bs, bs_open, prev))
-    formulas = BANK_FORMULAS if is_bank else CORP_FORMULAS
+        recs.append((bank_year if is_bank else corporate_year)(pl, bs, bs_open))
+    share_notes = restate_share_basis(recs, actions)
+    formulas = {**(BANK_FORMULAS if is_bank else CORP_FORMULAS), **SHARE_FORMULAS}
     units = BANK_UNITS if is_bank else CORP_UNITS
     cols = ["period", "period_end", *[c for c in units if any(r.get(c) is not None for r in recs) or c in formulas], "notes"]
     cols = list(dict.fromkeys(cols))
@@ -262,13 +312,17 @@ def compute(fin: dict, *, contingent_liabilities_cr: float | None = None, contin
         "annual_ratios": records_table(list(reversed(recs)), cols, {c: units[c] for c in cols if c in units}, source=src,
                                        notes="null = input not filed or ratio undefined (never imputed); see formulas"),
         "formulas": formulas,
-        "growth_cagr": growth(recs, ["nii", "pat_owners", "eps_basic"] if is_bank else ["revenue", "ebitda", "pat_owners", "eps_basic"]),
+        "growth_cagr": growth(recs, (["nii", "pat_owners"] if is_bank else ["revenue", "ebitda", "pat_owners"]) + ["eps_restated", "eps_basic"]),
+        "share_basis_notes": share_notes,
     }
     q = frame(fin.get("quarterly")).to_dict("records")
+    for r in q:
+        f = share_basis_factor(r["period_end"], actions) if actions is not None else None
+        r["eps_restated"] = r["eps_basic"] / f if f and fnum(r.get("eps_basic")) is not None else None
     if not is_bank:
         for r in q:
             r["ebitda"] = quarterly_ebitda(r)
-        out["ttm"] = ttm(q, ["revenue", "ebitda", "pat", "pat_owners", "eps_basic"])
+        out["ttm"] = ttm(q, ["revenue", "ebitda", "pat", "pat_owners", "eps_restated", "eps_basic"])
         qm = [{"period": r["period"], "period_end": r["period_end"], "revenue": r.get("revenue"),
                "ebitda_margin_pct": _pct(safe_div(r["ebitda"], r.get("revenue"))), "pat_margin_pct": _pct(safe_div(r.get("pat"), r.get("revenue")))}
               for r in sorted(q, key=lambda r: r["period_end"], reverse=True)]
@@ -284,15 +338,17 @@ def compute(fin: dict, *, contingent_liabilities_cr: float | None = None, contin
                                                                  inputs={"contingent_liabilities": num(contingent_liabilities_cr, INR_CR, source=contingent_source or "caller-supplied (cite!)"),
                                                                          "total_equity": num(nw, INR_CR, source="data financials", as_of=latest_bs["period_end"] if latest_bs else None)})
     else:
-        out["ttm"] = ttm(q, ["interest_earned", "pat", "pat_owners", "eps_basic"])
+        out["ttm"] = ttm(q, ["interest_earned", "pat", "pat_owners", "eps_restated", "eps_basic"])
         out["not_in_xbrl"] = {k: missing(v, PCT) for k, v in {
             "nim": "needs average interest-earning assets: take from the investor presentation (cite page)",
             "casa_ratio": "not in results XBRL: take from the investor presentation (cite page)",
             "credit_cost": "needs credit-only provisions: take from the presentation; provisions_to_avg_advances_pct is a proxy"}.items()}
-    out["dilution_history"] = records_table([{"period": r["period"], "shares_crore": r.get("shares_crore"), "share_count_change_pct": r.get("share_count_change_pct")}
-                                             for r in reversed(recs)], ["period", "shares_crore", "share_count_change_pct"],
-                                            {"shares_crore": "crore shares", "share_count_change_pct": PCT}, source=src,
-                                            notes="from paid-up capital / face value; bonus and split change this without dilution, check corporate actions")
+    dcols = ["period", "shares_crore", "share_basis_factor", "shares_restated_crore", "share_count_change_pct"]
+    out["dilution_history"] = records_table([{c: r.get(c) for c in dcols} for r in reversed(recs)], dcols,
+                                            {"shares_crore": "crore shares", "share_basis_factor": "x", "shares_restated_crore": "crore shares",
+                                             "share_count_change_pct": PCT}, source=src,
+                                            notes="shares from paid-up capital / face value at FY end; restated to today's basis for bonuses/splits, "
+                                                  "so share_count_change_pct is issuance/buyback only")
     return out
 
 
@@ -311,7 +367,11 @@ def load_financials(args) -> dict:
 
 def cmd_ratios(args) -> dict:
     fin = load_financials(args)
-    return {"identity": fin.get("identity"), **compute(fin, contingent_liabilities_cr=args.contingent_liabilities, contingent_source=args.contingent_source)}
+    first = min((r[fin["annual"]["columns"].index("period_end")] for r in fin.get("annual", {}).get("rows", [])), default=None)
+    actions, ca_note = share_actions(fin.get("identity"), first)
+    out = compute(fin, contingent_liabilities_cr=args.contingent_liabilities, contingent_source=args.contingent_source, actions=actions)
+    out["share_basis_notes"].append(ca_note)
+    return {"identity": fin.get("identity"), **out}
 
 
 def add_financials_args(p) -> None:

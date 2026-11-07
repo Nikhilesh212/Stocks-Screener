@@ -290,3 +290,20 @@ def test_fetch_gives_empty_bodies_short_ttl(routes):
     cache.fetch("https://www.nseindia.com/api/x", key="_market/x/past.json", ttl_hours=None)
     meta = json.loads(cache._meta_path(cache.cache_path("_market/x/past.json")).read_text())
     assert meta["ttl_hours"] == cache.EMPTY_TTL_HOURS
+
+
+def test_xbrl_undefined_main_contexts_are_dated_from_filing():
+    """RELIANCE FY19-FY21 legacy filings reference OneD/FourD/OneI without defining them."""
+    ns = 'xmlns:xbrli="http://www.xbrl.org/2003/instance" xmlns:f="http://www.bseindia.com/xbrl/fin/2020-03-31/in-bse-fin"'
+    facts = [("DateOfStartOfReportingPeriod", "FourD", "2020-04-01"), ("DateOfEndOfReportingPeriod", "FourD", "2021-03-31"),
+             ("DateOfStartOfReportingPeriod", "OneD", "2021-01-01"), ("DateOfEndOfReportingPeriod", "OneD", "2021-03-31"),
+             ("RevenueFromOperations", "FourD", "4863260000000"), ("Equity", "OneI", "100"), ("Other", "Mystery", "1")]
+    body = "".join(f'<f:{n} contextRef="{c}" unitRef="INR">{v}</f:{n}>' for n, c, v in facts)
+    inst = xbrl.parse(f"<xbrli:xbrl {ns}>{body}</xbrli:xbrl>".encode())
+    four, one_i = inst.contexts["FourD"], inst.contexts["OneI"]
+    assert (four.start, four.end, four.instant) == (D(2020, 4, 1), D(2021, 3, 31), False)
+    assert one_i.instant and one_i.end == D(2021, 3, 31)
+    assert "Mystery" not in inst.contexts  # cannot be dated from the filing: dropped, not guessed
+    assert inst.synthesized == ["FourD", "OneD", "OneI"]
+    (ctx, value, _), = xbrl.values_by_period(inst, "RevenueFromOperations")
+    assert ctx.id == "FourD" and value == 4863260000000

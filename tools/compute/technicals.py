@@ -15,6 +15,7 @@ import pandas as pd
 from ..common.errors import InputError
 from ..common.provenance import derived, missing, num
 from ..common.units import INR, INR_CR, PCT, RATIO
+from ._util import unadjusted_gaps
 
 SRC = "computed from NSE adjusted daily prices (data prices)"
 
@@ -115,9 +116,10 @@ def technicals(px: pd.DataFrame, index_df: pd.DataFrame | None = None, *, index_
     dd_df = df[df["date"] > asof - dt.timedelta(days=int(365.25 * dd_years))]
     mdd, pk, tr = max_drawdown(dd_df["adj_close"].to_numpy(), dd_df["date"].tolist())
     cur_dd = close[-1] / dd_df["adj_close"].max() - 1
+    short = dd_df["date"].iloc[0] > asof - dt.timedelta(days=int(365.25 * dd_years) - 7)
     out["drawdown"] = {
         "max": derived(mdd * 100, PCT, formula="largest peak-to-trough fall of adj_close", period=f"{dd_df['date'].iloc[0]}..{a}",
-                       notes=f"peak {pk}, trough {tr}"),
+                       notes=f"peak {pk}, trough {tr}" + (f"; cached history shorter than the {dd_years:g}y requested" if short else "")),
         "current_from_peak": derived(cur_dd * 100, PCT, formula="adj_close / max adj_close in window - 1", period=f"{dd_df['date'].iloc[0]}..{a}"),
     }
     liq = {}
@@ -133,6 +135,9 @@ def technicals(px: pd.DataFrame, index_df: pd.DataFrame | None = None, *, index_
     if "delivery_pct" in df.columns and df["delivery_pct"].tail(20).notna().any():
         liq["delivery_pct_20d"] = derived(float(df["delivery_pct"].tail(20).mean()), PCT, formula="mean delivery % over last 20 sessions", as_of=a)
     out["liquidity"] = liq
+    gaps = unadjusted_gaps(df)
+    if gaps:
+        out["warnings"] = gaps
     return out
 
 

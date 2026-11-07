@@ -8,3 +8,6 @@ data/manual/*
 !data/manual/README.md
 *.pdf
 !tests/fixtures/**/*.pdf
+
+# ledger dry runs (Session F uses ledger/test)
+ledger/test/

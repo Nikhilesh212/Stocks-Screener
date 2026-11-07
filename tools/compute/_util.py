@@ -138,3 +138,33 @@ def records_table(records: list[dict], columns: list[str], units: dict[str, str]
     from ..common.provenance import table
     rows = [[None if (isinstance(r.get(c), float) and (math.isnan(r[c]) or math.isinf(r[c]))) else r.get(c) for c in columns] for r in records]
     return table(columns, rows, units=units, source=source, notes=notes, as_of=as_of)
+
+
+def share_actions(identity: dict | None, since: str | None) -> tuple[list | None, str]:
+    """Corporate actions from `since` to today (NSE, cached), for share-basis restatement. None + note if unavailable."""
+    import datetime as dt
+
+    from ..common.entity import get_entity
+    from ..common.http import SourceError
+    from ..data.corpactions import corporate_actions
+    from ..common.provenance import today_ist
+    if not identity or not identity.get("isin") or not since:
+        return None, "corporate actions not fetched: no identity/ISIN or no period in input"
+    try:
+        e = get_entity(identity["isin"])
+        acts, url, retrieved = corporate_actions(e, dt.date.fromisoformat(str(since)[:10]) - dt.timedelta(days=1), today_ist())
+    except (SourceError, OSError) as ex:
+        return None, f"corporate actions unavailable ({ex}); EPS/share counts not restated"
+    return acts, f"share basis from NSE corporate actions {url} (retrieved {retrieved})"
+
+
+def unadjusted_gaps(px: pd.DataFrame, threshold: float = 0.25) -> list[str]:
+    """Overnight raw gaps beyond `threshold` that the adjustment factor does not explain (stale or unadjusted cache)."""
+    if not {"close", "open", "adj_factor"} <= set(px.columns) or len(px) < 2:
+        return []
+    d = px.sort_values("date").reset_index(drop=True)
+    gap = d["close"].shift(1) / d["open"]
+    step = d["adj_factor"].shift(1) / d["adj_factor"]
+    bad = d[((gap - 1).abs() > threshold) & ((gap / step - 1).abs() > threshold)]
+    return [f"{r.date}: overnight gap {gap[i]:.3f}x not explained by adj_factor; price series may be unadjusted for a bonus/split: "
+            f"re-run `data prices` (results across this date are unreliable)" for i, r in bad.iterrows()]

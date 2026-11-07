@@ -225,6 +225,8 @@ def statements(e: Entity, basis: str, quarters: int, years: int) -> dict:
         if isin_in_doc and not same_issuer_equity(isin_in_doc, e.isin):
             warns.append(f"{end}: XBRL ISIN {isin_in_doc} != {e.isin}; filing skipped (entity mismatch)")
             continue
+        if inst.synthesized:
+            warns.append(f"{end}: filing references undefined contexts {inst.synthesized}; dated from its own reporting-period facts")
         used.append({"period_end": end.isoformat(), "family": f["family"], "xbrl": f["xbrl"], "broadcast": f.get("broadcast")})
         for item, kind, s, t, val, unit in _extract(inst, BANK if is_bank else CORP):
             label = f"as of {t.isoformat()}" if kind == "instant" else period_label(s, t)

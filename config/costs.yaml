@@ -1,0 +1,222 @@
+# Cost and tax rates for NSE/BSE cash-market DELIVERY trades by a resident individual.
+# Read by tools/compute/costs_tax.py and the ledger postmortem.
+#
+# Each item is a list of entries. The entry with the latest effective_from on or before
+# the trade date applies (buy-side items: buy date; sell-side items and tax: sell date).
+# Every entry carries source_url and verified (the date the rate was checked).
+# Rates are fractions (0.001 = 0.1%) unless the unit says otherwise.
+# Verified 2026-11-08 against official sources (NSE, BSE, SEBI, CDSL, NSDL, Income Tax
+# Department, indiabudget.gov.in, egazette). Broker items are secondary (broker pages)
+# and are defaults: no broker has been chosen.
+# Rates change with Union Budgets and exchange circulars: re-verify after every Budget
+# (February) and when an exchange revises charges. Budget 2026 (Finance Act 2026)
+# changed STT on F&O only; nothing below changed.
+
+meta:
+  verified: 2026-11-08
+  scope: resident individual, STT-paid listed equity, delivery (CNC) trades
+  research_note: docs/costs_research_2026-11-08.md (per-item notes, history, confidence)
+
+charges:
+  brokerage_delivery:  # DEFAULT - confirm
+    - value: 0.001            # lower of INR 20 or 0.1% per executed order, minimum INR 5 (Groww)
+      cap_inr: 20.0
+      floor_inr: 5.0
+      unit: fraction of order value, per executed order
+      effective_from: 2020-01-01
+      source_url: https://groww.in/pricing
+      verified: 2026-11-08
+      notes: "DEFAULT - confirm: no broker chosen. Conservative choice; Zerodha charges 0 on delivery (https://zerodha.com/charges/)"
+
+  stt_delivery_buy:
+    - value: 0.001
+      unit: fraction of buy value
+      effective_from: 2013-06-01
+      source_url: https://nsearchives.nseindia.com/content/circulars/FATAX73524.pdf
+      verified: 2026-11-08
+      notes: "NSE/FATAX/73524 (31-Mar-2026) lists 0.1% as unchanged from 1-Apr-2026; 2013 start date from memory"
+  stt_delivery_sell:
+    - value: 0.001
+      unit: fraction of sell value
+      effective_from: 2013-06-01
+      source_url: https://nsearchives.nseindia.com/content/circulars/FATAX73524.pdf
+      verified: 2026-11-08
+      notes: "Finance Act 2026 raised STT on F&O only"
+
+  exchange_txn_nse:
+    - value: 0.00003451
+      unit: fraction of trade value, each side
+      effective_from: 2021-01-01
+      source_url: https://nsearchives.nseindia.com/content/circulars/FA56129.pdf
+      verified: 2026-11-08
+      notes: "volume slab INR 345 down to 320 per crore + INR 0.01 IPFT; top (retail) slab used"
+    - value: 0.0000335
+      unit: fraction of trade value, each side
+      effective_from: 2023-04-01
+      source_url: https://nsearchives.nseindia.com/content/circulars/FA73061.pdf
+      verified: 2026-11-08
+      notes: "volume slab INR 325 down to 300 per crore + INR 10 IPFT; top (retail) slab used"
+    - value: 0.0000307
+      unit: fraction of trade value, each side
+      effective_from: 2024-10-01
+      source_url: https://nsearchives.nseindia.com/content/circulars/FA73061.pdf
+      verified: 2026-11-08
+      notes: "flat INR 297 per crore + INR 10 IPFT = INR 307 per crore"
+    - value: 0.0000307
+      unit: fraction of trade value, each side
+      effective_from: 2026-03-01
+      source_url: https://nsearchives.nseindia.com/content/circulars/FA73061.pdf
+      verified: 2026-11-08
+      notes: "NSE/FA/73061: INR 306.99 transaction charge + INR 0.01 IPFT = INR 307 per crore (total unchanged)"
+  exchange_txn_bse:
+    - value: 0.0000375
+      unit: fraction of trade value, each side
+      effective_from: 2022-12-01
+      source_url: https://www.bseindia.com/Downloads/UploadDocs/Notices/Attach/Equity_Master_Circular$b0cfd71f-2ac1-4205-b6c5-5085f322e1ae.pdf
+      verified: 2026-11-08
+      notes: "groups A, B and other non-exclusive scrips (INR 375 per crore); BSE-exclusive scrips INR 275; X/XT/Z groups far higher. Earlier rate not verified"
+
+  sebi_fee:
+    - value: 0.0000015
+      unit: fraction of trade value, each side
+      effective_from: 2017-01-01
+      source_url: https://www.cse-india.com/upload/cse_notice/REVISED_SEBI_TURNOVER_FEES.htm
+      verified: 2026-11-08
+      notes: "INR 15 per crore"
+    - value: 0.000001
+      unit: fraction of trade value, each side
+      effective_from: 2019-04-01
+      source_url: https://www.nseindia.com/static/invest/first-time-investor-sebi-turnover-fees-stt-other-levies
+      verified: 2026-11-08
+      notes: "INR 10 per crore. A 50% cut for Jun-2020 to Mar-2021 was approved (https://www.sebi.gov.in/sebi_data/meetingfiles/jul-2020/1594293677017_1.pdf); implementation confirmed only by secondary sources, so not modelled"
+
+  stamp_duty_delivery_buy:
+    - value: 0.00015
+      unit: fraction of buy value, buyer only
+      effective_from: 2020-07-01
+      source_url: https://www.nseindia.com/static/invest/first-time-investor-stamp-duty-charges-taxes
+      verified: 2026-11-08
+      notes: "Indian Stamp Act as amended by Finance Act 2019 (INR 1,500 per crore); intraday buy 0.003%. Before Jul-2020: state-specific"
+
+  gst:
+    - value: 0.18
+      base: [brokerage, exchange_txn]
+      unit: fraction of the base
+      effective_from: 2017-07-01
+      source_url: https://www.nseindia.com/static/invest/first-time-investor-sebi-turnover-fees-stt-other-levies
+      verified: 2026-11-08
+      notes: "not charged on STT or stamp duty; SEBI fee was GST-exempt before 18-Jul-2022"
+    - value: 0.18
+      base: [brokerage, exchange_txn, sebi_fee]
+      unit: fraction of the base
+      effective_from: 2022-07-18
+      source_url: https://nsearchives.nseindia.com/web/sites/default/files/inline-files/SEBI_CIRCULAR_18072022.pdf
+      verified: 2026-11-08
+      notes: "GST on SEBI fee from 18-Jul-2022. DP charge below already includes its GST. The Sep-2025 GST rationalisation left broking at 18% (inferred from NSE page; CBIC notice not located)"
+
+  dp_charge_per_sell:  # DEFAULT - confirm
+    - value: 23.6
+      unit: INR per scrip per sell day, including GST
+      effective_from: 2024-10-01
+      source_url: https://groww.in/pricing
+      verified: 2026-11-08
+      notes: "DEFAULT - confirm: Groww INR 20 + GST (includes CDSL INR 3.50, https://www.cdslindia.com/DP/CurrentDPs.html). Zerodha: INR 15.34 incl. GST (https://zerodha.com/charges/). NSDL charges DPs INR 4.00 per debit"
+
+tax:
+  stcg_equity_rate:
+    - value: 0.15
+      unit: fraction of STCG
+      effective_from: 2018-04-01
+      section_1961: "111A"
+      source_url: https://www.incometaxindia.gov.in/w/section-111a-22
+      verified: 2026-11-08
+      notes: "transfers before 23-Jul-2024 (2018-04-01 is the start of the window checked, not the rate's origin)"
+    - value: 0.20
+      unit: fraction of STCG
+      effective_from: 2024-07-23
+      section_1961: "111A"
+      section_2025: "196"
+      source_url: https://www.incometaxindia.gov.in/w/section-196-78
+      verified: 2026-11-08
+      notes: "Finance (No. 2) Act 2024; Income-tax Act 2025 s.196 from 1-Apr-2026; unchanged by Finance Act 2026"
+  ltcg_equity_rate:
+    - value: 0.10
+      unit: fraction of LTCG above the exemption
+      effective_from: 2018-04-01
+      section_1961: "112A"
+      source_url: https://www.incometaxindia.gov.in/w/section-112a-65
+      verified: 2026-11-08
+    - value: 0.125
+      unit: fraction of LTCG above the exemption
+      effective_from: 2024-07-23
+      section_1961: "112A"
+      section_2025: "198"
+      source_url: https://www.incometaxindia.gov.in/w/section-198-78
+      verified: 2026-11-08
+      notes: "no indexation; shares bought before 1-Feb-2018 use grandfathered cost (1961 s.55(2)(ac), 2025 s.90(7)), not modelled"
+  ltcg_exemption_inr_per_fy:
+    - value: 100000.0
+      unit: INR per person per financial year, across all s.112A gains
+      effective_from: 2018-04-01
+      source_url: https://www.incometaxindia.gov.in/w/section-112a-65
+      verified: 2026-11-08
+    - value: 125000.0
+      unit: INR per person per financial year, across all s.112A / s.198 gains
+      effective_from: 2024-04-01
+      source_url: https://www.incometaxindia.gov.in/w/section-198-78
+      verified: 2026-11-08
+      notes: "FY 2024-25 onwards, covering transfers both before and after 23-Jul-2024"
+  ltcg_min_holding_months:
+    - value: 12
+      unit: "months; long-term if held MORE than this"
+      effective_from: 2018-04-01
+      section_1961: "2(42A)"
+      section_2025: "2(101)(b)"
+      source_url: https://egazette.gov.in/WriteReadData/2025/265620.pdf
+      verified: 2026-11-08
+  cess:
+    - value: 0.04
+      unit: fraction of income-tax plus surcharge
+      effective_from: 2018-04-01
+      source_url: https://www.indiabudget.gov.in/doc/memo.pdf
+      verified: 2026-11-08
+      notes: "Health and Education Cess"
+  surcharge_cap_cg:
+    - value: 0.15
+      unit: maximum surcharge on tax attributable to equity STCG/LTCG and dividends
+      effective_from: 2019-04-01
+      source_url: https://www.indiabudget.gov.in/doc/memo.pdf
+      verified: 2026-11-08
+      notes: "slabs: 10% above INR 50 lakh, 15% above INR 1 crore, 25% above INR 2 crore (new regime max 25%; old regime 37% above INR 5 crore). 2019 start date from memory"
+
+# Informational (not used in calculations; the user's slab rate and total income are unknown).
+info:
+  rebate:
+    - value: 60000.0
+      unit: INR, new regime, total income up to INR 12 lakh
+      effective_from: 2025-04-01
+      section_1961: "87A"
+      section_2025: "156"
+      source_url: https://www.incometaxindia.gov.in/w/section-156-88
+      verified: 2026-11-08
+      notes: "cannot reduce tax on STCG (s.111A / s.196) or LTCG (s.112A / s.198)"
+  dividend_tds_rate:
+    - value: 0.10
+      unit: fraction of dividend
+      effective_from: 2021-04-01
+      section_1961: "194"
+      section_2025: "393"
+      source_url: https://www.incometaxindia.gov.in/w/section-393-6
+      verified: 2026-11-08
+      notes: "dividends are taxed at the holder's slab rate; TDS is an advance. Interest is not deductible against dividends from FY 2026-27 (Finance Act 2026)"
+  dividend_tds_threshold_inr:
+    - value: 5000.0
+      unit: INR per company per financial year
+      effective_from: 2020-04-01
+      source_url: https://incometaxindia.gov.in/w/section-194-65
+      verified: 2026-11-08
+    - value: 10000.0
+      unit: INR per company per financial year
+      effective_from: 2025-04-01
+      source_url: https://incometaxindia.gov.in/w/section-194-65
+      verified: 2026-11-08
