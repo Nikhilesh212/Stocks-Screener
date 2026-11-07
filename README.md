@@ -1,0 +1,124 @@
+# Indian equity research system (Claude Code)
+
+A research team for Indian listed equities that runs inside Claude Code. When you ask for it, a Claude Code session forms its own view of the market, hunts for candidates through several lenses, researches each one from primary filings, has every thesis attacked by an independent red team, builds a portfolio and presents it to you. You review, challenge and decide. Picks you approve are frozen in an append-only ledger and tracked forward against the Nifty 500 Total Return Index, so the system's real record builds up over time.
+
+Code fetches facts and computes numbers, with provenance on every number; Claude decides what matters. No code ranks or scores stocks, nothing places orders, and the output is research for your own decisions, not investment advice.
+
+## Setup
+
+Requirements: Linux or macOS, [uv](https://docs.astral.sh/uv/), Claude Code.
+
+```bash
+uv sync
+```
+
+This installs Python 3.12 and the pinned dependencies into `.venv/`. Credentials are optional: copy `.env.example` to `.env` only if you want to override the User-Agent or add a key (never commit `.env`).
+
+**First time in Claude Code, and after pulling changes to `.claude/`:** restart Claude Code in the repo root and accept the workspace-trust prompt. The four subagents and their guard hooks load only at session start, and project hooks run only in a trusted workspace. `.claude/settings.json` pre-approves `uv run python -m tools ...`, web search/fetch and writes under `runs/`; anything else asks you first.
+
+## Tests and smoke test
+
+```bash
+uv run pytest
+```
+
+Offline: data-layer tests use recorded fixtures, compute and ledger tests use synthetic inputs, hook tests feed the guards sample tool calls.
+
+```bash
+uv run python -m tools smoke --table
+```
+
+Hits the live sources for RELIANCE, HDFCBANK and CAMS (or `--symbols A,B`) and prints a status table; the result is saved to `data/cache/smoke_status.json`. Run it before a research run to see which sources are up.
+
+## The tools
+
+`uv run python -m tools <group> <command> --help` lists every option. Output is JSON on stdout; check `status` first. Groups:
+
+- `data`: `resolve`, `prices`, `bhavcopy`, `index` (history, constituents, snapshot), `filings` (list, get, search, pages), `financials`, `shareholding`, `macro`, `events`.
+- `compute`: `calc`, `ratios`, `valuation`, `reverse_dcf`, `technicals`, `base_rates`, `portfolio`, `costs_tax`.
+- `ledger`: `freeze`, `mark`, `review`, `postmortem`, `correct`.
+- `smoke`.
+
+Examples:
+
+```bash
+uv run python -m tools data resolve CAMS
+```
+
+```bash
+uv run python -m tools compute valuation CAMS --peers KFINTECH
+```
+
+Downloads are cached in `data/cache/` keyed by ISIN (gitignored).
+
+## Running research
+
+Ask in plain words in a Claude Code session started in this repo; the `equity-research` skill picks it up. You can also type `/equity-research` with the mode as an argument.
+
+| Mode | Say something like | What happens |
+|---|---|---|
+| New run | "run research", "Dhanteras picks", "Diwali portfolio", "find stocks to buy" | Phases 0-7 below |
+| Single-company deep dive | "deep dive on Computer Age Management Services" | one analyst plus one red team; no portfolio, no freeze unless you ask |
+| Review | "review my picks", "check kill criteria" | `ledger review` and `ledger mark`, kill criteria judged per pick, hold/trim/exit/re-underwrite recommendations; notes in `runs/<run_id>/reviews/<date>.md` |
+| Post-mortem | "post-mortem 2026-10-15-dhanteras" | `ledger postmortem`, decision quality vs outcome, calibration, cohorts, at most five lessons into `ledger/lessons.md` |
+
+Add "dry run" to any request to use a `<date>-dryrun` run id and the test ledger (`ledger/test/`, gitignored).
+
+A new run goes through these phases, writing everything into `runs/<run_id>/`:
+
+0. **Mandate and memory**: you confirm `config/mandate.yaml` for this run (horizon, capital, drawdown tolerance, names, exclusions, themes); lessons from past post-mortems are applied; open runs are reviewed first.
+1. **Market read**: the `market-strategist` subagent writes `market_view.md`; you see a ten-line summary and may push back.
+2. **Hunting**: one `hunter` per lens (quality, value, momentum, policy/capex, small/mid caps, contrarian), merged into `candidates.json` and `shortlist.md` (15-25 names). **Checkpoint**: you approve the shortlist after seeing the usage estimate.
+3. **Deep dives**: one fresh `company-analyst` per name; dossier, machine summary and a separate conviction file with the probabilities.
+4. **Red team**: one `red-team` per dossier re-fetches the key numbers and attacks the thesis without seeing the conviction file; material discrepancies go back to a fresh analyst once.
+5. **Portfolio**: sizing within the mandate, `compute portfolio` checks, hidden common bets, comparison with buying the index and with cash.
+6. **Presentation**: the final report; challenge it.
+7. **Freeze**: only on your explicit approval, `ledger freeze` records the picks and cohorts A-E, and the run is committed to local git.
+
+How a run is judged: expected excess return over the Nifty 500 TRI over the horizon, net of costs and tax, within the mandate's limits, plus calibration of the stated probabilities (Brier score). Fewer picks, cash or "buy the index" are legitimate answers. Details: `.claude/skills/equity-research/references/evaluation.md`.
+
+### Scale of a full run
+
+A full run spawns about 1 strategist + 6 hunters + one analyst and one red team per shortlisted name, plus a second round for names sent back. For 20 names that is roughly 45-55 Opus subagent runs at high effort, each with dozens to over a hundred tool calls, and several hours of wall time. It uses a lot of your plan's usage; the session tells you its estimate before the deep dives and you can cut the list. A single-company deep dive is two or three subagent runs.
+
+Expect some permission prompts during a run: copying round-1 files before a re-analysis, git commits, edits under `ledger/`, and any Bash command a subagent runs other than the tools CLI and Claude Code's built-in read-only commands (`ls`, `cat`, `grep`, `find`, ...).
+
+## Review and post-mortem
+
+- **Review** after each results season or big news: say "review my picks" (or name the run). Each kill criterion is judged fired, not fired or unclear, with the announcement and page as evidence. `mark` returns are gross of costs and tax.
+- **Post-mortem** at the horizon end (an interim one before it with `--force`): returns net of costs and tax, with and without the annual LTCG exemption; Brier scores and a calibration table; cohort comparisons (A final portfolio, B all deep-dived names, C red-team kills, D all candidates, E the index) that show which stage adds value. One run's gaps are mostly noise: read them across runs.
+
+## Where things live
+
+| Path | What |
+|---|---|
+| `tools/` | Python CLI: `common/` (provenance, cache, HTTP policy, entity resolution), `data/`, `compute/`, `ledger/` |
+| `tests/` | pytest suite and recorded fixtures (`tests/fixtures/record.py` re-records them) |
+| `config/mandate.yaml` | horizon, benchmark, limits, liquidity floor, exclusions |
+| `config/sources.yaml` | data sources, priority, status |
+| `config/costs.yaml` | transaction costs and tax rates, each with source and date |
+| `.claude/skills/equity-research/` | `SKILL.md` (the run protocol) and `references/` (failure modes, red flags, valuation guide, output schemas, evaluation) |
+| `.claude/agents/` | `market-strategist`, `hunter`, `company-analyst`, `red-team` |
+| `.claude/hooks/` | guards that confine each subagent's writes and Bash to its own area of the run folder, and keep conviction files from the red team |
+| `runs/<run_id>/` | one folder per run; layout in `references/output-schemas.md` |
+| `ledger/` | `picks.jsonl` (append-only), `postmortems/`, `lessons.md`; `ledger/test/` for dry runs |
+| `docs/BUILD_STATE.md` | build status, decisions and known gaps; `docs/SPEC.md` is the original specification |
+
+## Things to confirm
+
+- `config/mandate.yaml`: every value marked `# DEFAULT - confirm` was a default, not your choice. Phase 0 asks about them each run; edit the file to change the defaults.
+- `config/costs.yaml`: brokerage and DP charge are defaults (the more expensive of Zerodha and Groww). Set them once you choose a broker, and re-verify statutory rates after each Budget.
+
+## Known gaps
+
+- **Financial history**: exchange XBRL starts around FY18 and some years are missing (RELIANCE has no FY22 filing; CAMS and HDFCBANK consolidated from FY23/FY24). Five- and ten-year CAGRs often come back null with a reason; analysts take older years from annual reports. Balance sheet and cash flow exist only at H1 and FY.
+- **Banks**: NIM, CASA and credit cost are not in XBRL (analysts read presentations); asset quality is standalone-only, and HDFCBANK standalone XBRL stops at Q3FY25. HDFCBANK has no promoter group.
+- **Macro**: no keyless source for CPI or crude; agents cite dated releases.
+- **Index P/E** changed method on 31-Mar-2021 (standalone to consolidated earnings); `base_rates` splices it by default.
+- **Price history**: the cache holds 2-3 years unless `data prices SYM --years 10` is run, which analysts do before valuation. Peers need their own price cache.
+- **Costs**: grandfathering of pre-2018 cost, STCG basic-exemption absorption, rebate under s.87A and your slab rate are not modelled (dividend tax only with `--slab-rate`).
+- **Industry**: `data resolve` gives the broad index-list industry; basic industry comes from announcements.
+- **Rate limits are per process.** Parallel subagents each run their own tools process, so NSE sees several request streams at once. The skill starts deep dives in batches of about five; if `source_error` or HTTP 429 shows up, use smaller batches.
+- **Not yet verified live** (Session F dry run): that an out-of-area subagent write is really blocked by the frontmatter hooks, and that `Edit(runs/**)` matches the subagents' writes without prompting.
+
+Open follow-ups: a `permissions.deny` rule for `Read(.env)` (the hooks block `.env` in Bash only); whether subagents may run the read-only `ledger mark` during reviews (the hooks currently refuse the whole `ledger` group).

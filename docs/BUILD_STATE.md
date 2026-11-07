@@ -12,8 +12,8 @@ Update this file and commit at the end of every phase.
 | B | Docs + plan | done 2026-11-08: plan approved with defaults (below) |
 | C | Data layer + smoke | done 2026-11-08 (fixture tests added in Session D1) |
 | D | Compute + ledger + tests + costs.yaml | done 2026-11-08 (Sessions D1, D2): 63 tests green |
-| E | References, 4 agents, SKILL.md, CLAUDE.md, README, settings.json, hooks | E1 done 2026-11-08 (references, hooks + tests, settings.json); **E2 next**: start from "Session E2 brief" below |
-| F | Dry run (needs Claude Code restart first) | not started |
+| E | References, 4 agents, SKILL.md, CLAUDE.md, README, settings.json, hooks | done 2026-11-08 (E1: references, hooks + tests, settings.json; E2: agents, SKILL.md, CLAUDE.md, README, `tests/test_agents.py`): 170 tests green |
+| F | Dry run (needs Claude Code restart first) | **next**: restart Claude Code, then start from "Session F brief" below |
 | G | Hand-over | not started |
 
 ## Decisions in force (user-approved)
@@ -96,6 +96,8 @@ HTTP test seam: `tools.common.http.set_transport(fn)` swaps in a recorded-fixtur
 - Cost model: broker items (brokerage, DP charge) are DEFAULTs (Groww tariff, the more expensive of Zerodha/Groww); exchange charges use the top retail slab before Oct-2024; grandfathering (pre-2018 cost), STCG basic-exemption absorption, 87A and the user's slab rate are not modelled (dividend tax only with `--slab-rate`).
 - `data resolve` industry = broad index-list industry; basic industry from announcements' `smIndustry`.
 - HDFCBANK has no promoter group; shareholding shows promoter null, public 100.
+- HTTP rate limits are per process, so parallel subagents multiply the request rate to NSE (SKILL batches analysts about 5 at a time). See Session E2 results.
+- No tool computes P/B or dividend-yield percentiles for indices (P/E only, via `base_rates`).
 
 ## Smoke result 2026-11-08 (RELIANCE, HDFCBANK, CAMS)
 
@@ -152,7 +154,7 @@ Carry over from Phase D:
 ### Session E1 results (2026-11-08)
 Built: `.claude/skills/equity-research/references/` (5 files), `.claude/hooks/` (3 guards + `_guard_common.py`), `.claude/settings.json`, `tests/test_hooks.py` (100 cases). Also fixed: `data --help` crashed (stray `%` in the `prices` help; `tests/test_compute.py::test_every_cli_help_renders` now walks every subcommand, including nested `data index ...` and `data filings ...`); ledger cohort discovery now treats red-team verdict `killed` (spec wording; `kill` still accepted) as cohort C and skips `*.conviction.json` when reading `dossiers/*.json` for cohort B (`tests/test_ledger.py::test_discover_cohorts_reads_run_files`).
 
-### Session E2 brief (start here)
+### Session E2 brief (done; kept for reference)
 Write the 4 agent definitions (`.claude/agents/{market-strategist,hunter,company-analyst,red-team}.md`), `.claude/skills/equity-research/SKILL.md`, `CLAUDE.md` and `README.md` on top of what E1 built. Re-read each agent as if it had no other context. Update this file, `uv run pytest`, commit. Then the user restarts Claude Code (new agents, skill and hooks load only after a restart; project hooks also need workspace trust).
 
 **Reference files** (`.claude/skills/equity-research/references/`, written for subagents with no other context; point each agent at the ones it needs, by path):
@@ -204,12 +206,52 @@ What the hooks enforce (tell each agent, so it does not waste turns on blocked c
 
 **Things E2 must handle in the agent/skill text:**
 - Agent `tools:` Read, Grep, Glob, Bash, WebSearch, WebFetch, Write, Edit; `model: opus`, `effort: high`; `disallowedTools: Agent`.
-- `.claude/settings.json` allows only `Bash(uv run python -m tools *)`, `WebSearch`, `WebFetch`, `Edit(runs/**)`. Read-only Bash (ls, cat, grep) is not pre-approved, so subagent use of it raises permission prompts in the main session: tell agents to prefer the Read/Grep/Glob tools for files. Check in Session F that `Edit(runs/**)` (relative path) matches writes when Claude Code runs from the repo root.
+- `.claude/settings.json` allows only `Bash(uv run python -m tools *)`, `WebSearch`, `WebFetch`, `Edit(runs/**)`. Read-only Bash (ls, cat, grep) is not pre-approved, so subagent use of it raises permission prompts in the main session: tell agents to prefer the Read/Grep/Glob tools for files. (Superseded in E2: common read-only Bash is auto-approved by Claude Code; see Session E2 results.) Check in Session F that `Edit(runs/**)` (relative path) matches writes when Claude Code runs from the repo root.
 - Hunters have no universe-wide fundamentals screener. Search aids: `data index constituents NAME`, `data index snapshot` (sector P/E etc.), `data bhavcopy --date D [--symbols]` (cross-section of closes/turnover/delivery), web search, then per-name `compute valuation/technicals/ratios`. They choose the parameters; screens never gate.
 - The analyst passes `--out runs/<run_id>/dossiers/work/<SYM>/...` when saving tool output (e.g. for `compute ratios --input`), never a path elsewhere.
 - Spawn prompts pass only: company (symbol), run_id, mandate path, market-view path (and, for round 2, the discrepancy list). Never the hoped-for answer.
 
 **Follow-ups to offer the user (not done, need approval):** a `permissions.deny` rule for `Read(.env)` (guard_bash already blocks `.env` in Bash; the Read tool is unguarded); whether subagents may run `ledger mark` (read-only) during reviews (currently blocked with the whole `ledger` group).
 
-### Session F: dry run
-One lens, three companies, red team on all, portfolio step; `runs/<date>-dryrun/`; freeze only to `ledger/test/`. Report what worked, failure modes caught, shallowness, time/usage, fixes.
+### Session E2 results (2026-11-08)
+Built: `.claude/agents/{market-strategist,hunter,company-analyst,red-team}.md`, `.claude/skills/equity-research/SKILL.md` (237 lines), `CLAUDE.md`, `README.md`, `tests/test_agents.py` (6 tests: agent frontmatter and exact hook command lines, referenced files exist, skill trigger phrases and size, and every `data|compute|ledger` command and `--option` named in the agents, skill, README and CLAUDE.md exists in the argparse tree). `uv run pytest`: 170 passed.
+
+Verified in the current Claude Code docs (hooks, sub-agents, permissions, tools-reference; 2026-11-08):
+- Hook commands run via `sh -c`, and `CLAUDE_PROJECT_DIR` is exported to the hook process. Frontmatter hooks use "the same format"; the docs do not say separately whether they get the variable. Hooks run in Claude Code's current directory (not stated to be the project root). **Decision:** hook lines use `"${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/..."`, identical when the variable is set and falling back to the session cwd (the repo root) when not. Tested with `sh -c` both ways: an out-of-area write is blocked with the guard's own reason.
+- **Grep and Glob tools are absent by default on Linux/macOS**; Claude uses Bash `grep`/`find` (embedded ugrep/bfs). They come back only via `--tools`/`--allowedTools`, or for a subagent whose `tools:` lists them and omits Bash. The agents keep them in `tools:` (per spec) and are told to use them if present, else `grep`/`find`.
+- **Claude Code auto-approves a built-in read-only Bash set** in every mode: ls, cat, echo, pwd, head, tail, grep, find, wc, which, diff, stat, du, cd, read-only git. A compound command runs without a prompt only if every part is allowed. `jq`, `sort` and `rg` are not named, so they may prompt. E1's note that read-only Bash is not pre-approved was wrong for the common commands. Agents are told to avoid `jq`, `sort` and `rg`.
+- Context saving: agents run big commands as `uv run python -m tools <cmd> --out runs/<run_id>/<area>/work/... | grep '"status"'` (passes guard_bash, no prompt) and then read parts of the saved file.
+
+Decisions made in E2 (tell the user in hand-over):
+1. Subagents reply to the main session in a few lines (paths, status, gaps, verdict); analysts never put probabilities in the reply.
+2. Analysts must not open other dossiers, conviction files, `hunters/`, `candidates.json` or `shortlist.md`; spawn prompts never mention the lens or why a name was shortlisted. Round-2 analysts may read `dossiers/round1/<SYM>.md`, never its conviction file.
+3. Hunters use 3-year prices (`data prices SYM`) for a first look and label percentiles "shorter than 5y"; analysts fetch 10 years.
+4. Deep-dive mode: `run_id = YYYY-MM-DD-<sym>-deepdive`, the analyst gets `market view: none for this deep dive`; no freeze unless the user asks.
+5. "dry run" in a request means `run_id` `<date>-dryrun[-slug]` and `--ledger-dir ledger/test` on every ledger command.
+6. Phase 3 runs analysts in batches of about 5 (rate-limit gap below), never more than 20 concurrent subagents.
+7. Hard exclusions applied mechanically: universe, `exclusions`, liquidity floor. `avoid_themes` is judged per name with a stated reason.
+8. Red-team "material" discrepancy: would change a conclusion, a scenario return, a valuation reading or a red-flag mark; any entity, period, unit or basis mismatch on a decision-relevant number.
+9. Phase 0 finds open runs by grepping `ledger/picks.jsonl` for `"record_type": "run"` without a `postmortem` record (no ledger "list runs" command exists).
+
+New known gaps (also in README):
+- **HTTP rate limits are per process** (`tools/common/http.py`: `_wait` keeps `_last` in memory), so N parallel subagents send N request streams to NSE. Mitigation: batches of about 5. A cross-process limiter (file lock or timestamp file in `data/cache/`) would fix it.
+- Agents have no prompt-free JSON validator (`jq` is not auto-approved; `python` is refused by guard_bash). They Read their JSON back; `ledger freeze` validation catches freeze-input errors.
+- No tool computes P/B or dividend-yield percentiles for indices (only P/E, via `base_rates`).
+
+Open follow-ups (need the user's approval): a `permissions.deny` rule for `Read(.env)`; subagent access to the read-only `ledger mark`; `Bash(jq *)` in the allowlist; the cross-process rate limiter.
+
+### Session F brief (start here, after restarting Claude Code)
+Goal (spec §10 Phase F): a dry run end to end. One lens, three companies, red team on all, portfolio step, freeze only to `ledger/test/`. Then report what worked, failure modes caught, shallowness, time and usage, and fixes.
+
+0. Preconditions: the user restarted Claude Code in the repo root and accepted workspace trust (project hooks need it). Confirm the four agents and the `equity-research` skill are available. `uv run pytest` green; `uv run python -m tools smoke --table` (note sources that are down).
+1. Cheap hook checks before spending usage. Create `runs/<today>-hooktest/` (Write a placeholder `mandate.yaml`), then spawn short test-only subagents ("Hook test only, do not research: try each of these and report each result verbatim, then stop"). Remove the folder afterwards, with the user's OK.
+   - hunter: Write `runs/<id>/hunters/t.md` should succeed **without a permission prompt** (checks that `Edit(runs/**)` matches); Write `runs/<id>/dossiers/t.md` should be blocked with guard_writes' reason (a "can't open file" error instead would mean the `CLAUDE_PROJECT_DIR` fallback failed); `uv run python -m tools data resolve CAMS` runs without a prompt; `uv run python -m tools ledger mark x` is blocked; `cat config/mandate.yaml` runs without a prompt.
+   - red-team: after the main session writes a dummy `runs/<id>/dossiers/T.conviction.json` and `T.md`, Read of the conviction file is blocked by guard_conviction and Read of `T.md` succeeds.
+   If anything misbehaves, fix the hook lines or settings before step 2 and record the change here.
+2. Dry run: invoke the skill ("dry run: run research with one lens, quality, and a shortlist of three names"). Follow SKILL.md; the user answers the Phase 0 mandate prompt and both checkpoints. `run_id` `<today>-dryrun`; every ledger command with `--ledger-dir ledger/test`.
+3. Watch and record under "Session F results" here:
+   - per subagent: duration, tokens and tool calls (task notifications), context pressure or compaction, every permission prompt and what triggered it;
+   - schema conformance of `candidates.json`, dossier `.json`/`.conviction.json`, red-team `.json`, `freeze_input.json`; `ledger freeze` validation and cohort discovery (B from dossiers, C from `killed`, D from candidates);
+   - failure modes the red team caught; numbers without citations; mental math; depth differences between the three dossiers; honesty of reading logs;
+   - NSE rate limiting with three parallel analysts (`source_error`, HTTP 429).
+4. Fix what the dry run exposes (agents, SKILL.md, references, tools), rerun `uv run pytest`, commit locally. Write a "Session G brief" for the hand-over: known gaps, cost DEFAULTs in `config/costs.yaml`, mandate DEFAULTs, the open follow-ups, E1 decisions 1-7 and E2 decisions 1-9.
