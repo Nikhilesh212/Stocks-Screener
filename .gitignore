@@ -7,7 +7,13 @@ data/cache/
 data/manual/*
 !data/manual/README.md
 *.pdf
-!tests/fixtures/**/*.pdf
+
+# recorded test fixtures are real NSE responses and company filings: NSE's terms restrict
+# redistributing its data, so each machine records its own (tests/fixtures/record.py --fetch)
+tests/fixtures/*
+!tests/fixtures/*.py
+!tests/fixtures/README*
+!tests/fixtures/.gitkeep
 
 # ledger dry runs (Session F uses ledger/test)
 ledger/test/

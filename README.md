@@ -20,11 +20,19 @@ This installs Python 3.12 and the pinned dependencies into `.venv/`. Credentials
 
 ## Tests and smoke test
 
+The data-layer tests run on real NSE responses and company filings for RELIANCE, HDFCBANK and CAMS. NSE's terms restrict redistributing its data, so these fixtures are not in the repository: record them once on your machine.
+
+```bash
+uv run python tests/fixtures/record.py --fetch
+```
+
+This fetches about 30 files from NSE into `data/cache/` through the tools' polite client, then writes trimmed copies to `tests/fixtures/` (gitignored). Trimming only filters rows; it never edits them. If NSE no longer serves one of the historical windows or filings, the script stops, names the fixture and says why, and writes nothing. Without the fixtures, the tests that need them skip and print that command; the other tests still run.
+
 ```bash
 uv run pytest
 ```
 
-Offline: data-layer tests use recorded fixtures, compute and ledger tests use synthetic inputs, hook tests feed the guards sample tool calls.
+Offline: data-layer tests use the recorded fixtures, compute and ledger tests use synthetic inputs, hook tests feed the guards sample tool calls.
 
 ```bash
 uv run python -m tools smoke --table
@@ -95,7 +103,7 @@ Expect some permission prompts during a run: copying round-1 files before a re-a
 | Path | What |
 |---|---|
 | `tools/` | Python CLI: `common/` (provenance, cache, HTTP policy, entity resolution), `data/`, `compute/`, `ledger/` |
-| `tests/` | pytest suite and recorded fixtures (`tests/fixtures/record.py` re-records them) |
+| `tests/` | pytest suite; `tests/fixtures/record.py --fetch` records the real-data fixtures on your machine (gitignored) |
 | `config/mandate.yaml` | horizon, benchmark, limits, liquidity floor, exclusions |
 | `config/sources.yaml` | data sources, priority, status |
 | `config/costs.yaml` | transaction costs and tax rates, each with source and date |

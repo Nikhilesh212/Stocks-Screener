@@ -15,7 +15,7 @@ Output is research for the user's own decisions, not advice. Picks the user appr
 ## Commands
 
 - Setup: `uv sync`
-- Tests (offline, recorded fixtures): `uv run pytest`
+- Tests (offline, recorded fixtures): `uv run pytest`. The fixtures are real NSE data kept out of git; record them once with `uv run python tests/fixtures/record.py --fetch` (fixture tests skip until then)
 - Smoke test (live sources): `uv run python -m tools smoke --table`
 - Tools: `uv run python -m tools <data|compute|ledger> <command> --help`; JSON on stdout, check `status` first.
 - Research modes (skill `equity-research`): new run ("run research", "Dhanteras picks"), review ("review my picks"), post-mortem ("post-mortem <run_id>"), single company ("deep dive on <company>"). Add "dry run" to keep the real ledger clean (`--ledger-dir ledger/test`).

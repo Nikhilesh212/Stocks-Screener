@@ -8,4 +8,4 @@ By submitting a pull request, patch or other contribution, you agree that:
 
 Point 3 lets the project keep offering commercial licences. If you cannot agree to it, open an issue instead of a pull request.
 
-Before opening a pull request, run `uv run pytest`. Never commit `.env`, `data/cache/`, `runs/` or `ledger/` files.
+Before opening a pull request, record the test fixtures once with `uv run python tests/fixtures/record.py --fetch` (real NSE data, fetched to your machine), then run `uv run pytest` and check that nothing is skipped. Never commit `.env`, `data/cache/`, `runs/` or `ledger/` files, or the recorded files in `tests/fixtures/`: they are NSE data, which NSE's terms do not let us redistribute, and `.gitignore` keeps them out. A new fixture must be cut from a real response by `record.py` (rows filtered, never edited), never written by hand.
