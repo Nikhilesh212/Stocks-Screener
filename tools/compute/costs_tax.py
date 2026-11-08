@@ -103,7 +103,7 @@ def round_trip(buy_value: float, sell_value: float, buy_date: dt.date, sell_date
         for item, (amt, e) in lines.items():
             block[item] = derived(amt, INR, formula=_formula(item, e, value), as_of=on.isoformat(),
                                   inputs={"rate": _rate_num(e, float(e["value"]), e.get("unit", "fraction"), f"config/costs.yaml charges ({item})")},
-                                  notes="DEFAULT - confirm (no broker chosen)" if item == "brokerage" else None)
+                                  notes="user-confirmed default (no broker chosen)" if item == "brokerage" else None)
         side_total = sum(a for a, _ in lines.values())
         block["total"] = derived(side_total, INR, formula=f"sum of {side} lines")
         out[side] = block

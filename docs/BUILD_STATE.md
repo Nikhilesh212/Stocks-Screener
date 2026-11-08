@@ -14,7 +14,7 @@ Update this file and commit at the end of every phase.
 | D | Compute + ledger + tests + costs.yaml | done 2026-11-08 (Sessions D1, D2): 63 tests green |
 | E | References, 4 agents, SKILL.md, CLAUDE.md, README, settings.json, hooks | done 2026-11-08 (E1: references, hooks + tests, settings.json; E2: agents, SKILL.md, CLAUDE.md, README, `tests/test_agents.py`): 170 tests green |
 | F | Dry run (needs Claude Code restart first) | done 2026-11-08: hooks verified live; dry run `2026-11-08-dryrun` end to end (1 lens, 3 names, red team on all, portfolio, freeze to `ledger/test`); 5 tool fixes + 4 definition fixes; 174 tests green. See "Session F results" |
-| G | Hand-over | done 2026-11-08: agent definitions confirmed live; 174 tests green; smoke 21/21 ok; `docs/HANDOVER.md` written and linked from README. Second dry run not run (optional; needs the user's go-ahead). See "Session G results" |
+| G | Hand-over | done 2026-11-08: agent definitions confirmed live; 174 tests green; smoke 21/21 ok; `docs/HANDOVER.md` written and linked from README. Second dry run not run (optional; needs the user's go-ahead). See "Session G results". Mandate and cost defaults confirmed by the user after hand-over (2026-11-08) |
 
 ## Decisions in force (user-approved)
 

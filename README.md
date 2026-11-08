@@ -109,8 +109,8 @@ Expect some permission prompts during a run: copying round-1 files before a re-a
 
 ## Things to confirm
 
-- `config/mandate.yaml`: every value marked `# DEFAULT - confirm` was a default, not your choice. Phase 0 asks about them each run; edit the file to change the defaults.
-- `config/costs.yaml`: brokerage and DP charge are defaults (the more expensive of Zerodha and Groww). Set them once you choose a broker, and re-verify statutory rates after each Budget.
+- `config/mandate.yaml`: the defaults were confirmed on 2026-11-08 (marked `# user-confirmed 2026-11-08`). Phase 0 still asks you to confirm or change them for each run; edit the file to change the defaults.
+- `config/costs.yaml`: brokerage and DP charge are defaults you confirmed on 2026-11-08 (the more expensive of Zerodha and Groww). Revisit them if you choose a broker, and re-verify statutory rates after each Budget.
 
 ## Known gaps
 

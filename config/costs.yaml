@@ -7,7 +7,7 @@
 # Rates are fractions (0.001 = 0.1%) unless the unit says otherwise.
 # Verified 2026-11-08 against official sources (NSE, BSE, SEBI, CDSL, NSDL, Income Tax
 # Department, indiabudget.gov.in, egazette). Broker items are secondary (broker pages)
-# and are defaults: no broker has been chosen.
+# and are user-confirmed defaults (2026-11-08): no broker has been chosen.
 # Rates change with Union Budgets and exchange circulars: re-verify after every Budget
 # (February) and when an exchange revises charges. Budget 2026 (Finance Act 2026)
 # changed STT on F&O only; nothing below changed.
@@ -18,7 +18,7 @@ meta:
   research_note: docs/costs_research_2026-11-08.md (per-item notes, history, confidence)
 
 charges:
-  brokerage_delivery:  # DEFAULT - confirm
+  brokerage_delivery:  # user-confirmed 2026-11-08 (no broker chosen; revisit when one is)
     - value: 0.001            # lower of INR 20 or 0.1% per executed order, minimum INR 5 (Groww)
       cap_inr: 20.0
       floor_inr: 5.0
@@ -26,7 +26,7 @@ charges:
       effective_from: 2020-01-01
       source_url: https://groww.in/pricing
       verified: 2026-11-08
-      notes: "DEFAULT - confirm: no broker chosen. Conservative choice; Zerodha charges 0 on delivery (https://zerodha.com/charges/)"
+      notes: "User-confirmed default 2026-11-08: no broker chosen. Conservative choice; Zerodha charges 0 on delivery (https://zerodha.com/charges/)"
 
   stt_delivery_buy:
     - value: 0.001
@@ -114,13 +114,13 @@ charges:
       verified: 2026-11-08
       notes: "GST on SEBI fee from 18-Jul-2022. DP charge below already includes its GST. The Sep-2025 GST rationalisation left broking at 18% (inferred from NSE page; CBIC notice not located)"
 
-  dp_charge_per_sell:  # DEFAULT - confirm
+  dp_charge_per_sell:  # user-confirmed 2026-11-08 (no broker chosen; revisit when one is)
     - value: 23.6
       unit: INR per scrip per sell day, including GST
       effective_from: 2024-10-01
       source_url: https://groww.in/pricing
       verified: 2026-11-08
-      notes: "DEFAULT - confirm: Groww INR 20 + GST (includes CDSL INR 3.50, https://www.cdslindia.com/DP/CurrentDPs.html). Zerodha: INR 15.34 incl. GST (https://zerodha.com/charges/). NSDL charges DPs INR 4.00 per debit"
+      notes: "User-confirmed default 2026-11-08: Groww INR 20 + GST (includes CDSL INR 3.50, https://www.cdslindia.com/DP/CurrentDPs.html). Zerodha: INR 15.34 incl. GST (https://zerodha.com/charges/). NSDL charges DPs INR 4.00 per debit"
 
 tax:
   stcg_equity_rate:

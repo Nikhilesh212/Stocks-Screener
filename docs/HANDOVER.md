@@ -5,8 +5,8 @@ The research system is built and has passed one end-to-end dry run. This page is
 ## Before the first real run
 
 1. **Restart Claude Code in the repo root.** Session F changed the four agent definitions, and Claude Code loads them only when a session starts. A session started before 11:37 IST on 2026-11-08 still has the old ones. Accept workspace trust when asked, because the project agents' guard hooks run only after trust is accepted.
-2. **Confirm the mandate DEFAULTs** in [`config/mandate.yaml`](../config/mandate.yaml) (list below). Phase 0 asks about them every run; edit the file to change the defaults.
-3. **Confirm the cost DEFAULTs** in [`config/costs.yaml`](../config/costs.yaml) once you choose a broker, and re-verify the statutory rates after each Budget.
+2. ~~Confirm the mandate DEFAULTs~~ Done 2026-11-08: you accepted every default in [`config/mandate.yaml`](../config/mandate.yaml) (list below); each is now marked `# user-confirmed 2026-11-08`. Phase 0 still asks you to confirm or change them for each run; edit the file to change the defaults.
+3. ~~Confirm the cost DEFAULTs~~ Done 2026-11-08: you accepted the brokerage and DP-charge defaults in [`config/costs.yaml`](../config/costs.yaml) (Groww rates, the dearer of Zerodha and Groww). Revisit them if you choose a broker, and re-verify the statutory rates after each Budget.
 4. **Decide the open follow-ups** below. None of them blocks a run.
 5. **Plan for the size of a run.** A full run spans several 5-hour usage windows (see "Scale of a full run").
 
@@ -97,7 +97,7 @@ Measured in the Session F dry run (1 lens, 3 names, red team on all three):
 - **Macro**: no keyless source for CPI or crude; agents cite dated releases.
 - **Index P/E** changed method on 2021-03-31 (standalone to consolidated earnings). `base_rates` splices it by default. No tool computes P/B or dividend-yield percentiles for indices.
 - **Valuation history**: the price cache holds 2-3 years until `data prices SYM --years 10` is run, which analysts do before valuation. Peers need their own price cache, and a peer without one is listed with the error. Own-history percentiles rest on the XBRL earnings history, which is often only 25-28 months even with 10 years of prices, and they are labelled "shorter than 5y".
-- **Costs**: brokerage and DP charge are DEFAULTs. Grandfathering of pre-2018 cost, absorption of the STCG basic exemption, the s.87A rebate and your slab rate are not modelled (dividend tax is computed only with `--slab-rate`).
+- **Costs**: brokerage and DP charge are user-confirmed defaults (no broker chosen). Grandfathering of pre-2018 cost, absorption of the STCG basic exemption, the s.87A rebate and your slab rate are not modelled (dividend tax is computed only with `--slab-rate`).
 - **Industry**: `data resolve` gives the broad index-list industry; basic industry comes from announcements.
 - **Rate limits are per process**, so parallel subagents send parallel request streams to NSE. The skill runs deep dives in batches of about five. The dry run hit no 429 with three analysts in parallel; five or more is untested.
 - **No OCR**: scanned results PDFs cannot be read, and `filings get` warns about them. Analysts fall back to transcripts and dated press reports.
@@ -105,9 +105,9 @@ Measured in the Session F dry run (1 lens, 3 names, red team on all three):
 - **`Edit(runs/**)` without prompts is unverified**: Sessions F and G ran in bypass-permissions mode.
 - **Not yet exercised end to end**: the new analyst news sweep, holder-shaped kill criteria, a round-2 send-back (the dry run had no material discrepancies) and a red-team kill (cohort C was empty). See "Optional second dry run".
 
-## DEFAULTs you must confirm
+## Mandate defaults (confirmed 2026-11-08)
 
-[`config/mandate.yaml`](../config/mandate.yaml). Each of these is marked `# DEFAULT - confirm`:
+[`config/mandate.yaml`](../config/mandate.yaml). You accepted each of these on 2026-11-08; each is marked `# user-confirmed 2026-11-08`:
 
 | Key | Default |
 |---|---|
@@ -122,7 +122,7 @@ Measured in the Session F dry run (1 lens, 3 names, red team on all three):
 | `liquidity.participation_rate` | 0.15 |
 | `exclusions`, `include_themes`, `avoid_themes` | empty |
 
-Set by the spec and not marked DEFAULT: benchmark `NIFTY 500 TRI`, `min_positions: 0` (index or cash are valid answers), universe `NSE main board` (SME excluded), `allow_cash: true`, `instruments: equity_cash_only` (no F&O, leverage or shorting).
+Set by the spec, not defaults: benchmark `NIFTY 500 TRI`, `min_positions: 0` (index or cash are valid answers), universe `NSE main board` (SME excluded), `allow_cash: true`, `instruments: equity_cash_only` (no F&O, leverage or shorting).
 
 [`config/costs.yaml`](../config/costs.yaml). No broker has been chosen, so the more expensive of Groww and Zerodha is used:
 - `brokerage_delivery`: 0.1% per executed order, capped at INR 20 with a floor of INR 5 (Groww). Zerodha charges 0 on delivery.

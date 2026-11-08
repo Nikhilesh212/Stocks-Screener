@@ -398,7 +398,7 @@ def test_costs_yaml_is_sourced():
                 assert e.get("source_url", "").startswith("http"), name
                 assert e.get("verified") and e.get("effective_from"), name
     text = costs_tax.COSTS_PATH.read_text()
-    assert "brokerage_delivery:  # DEFAULT - confirm" in text
+    assert "brokerage_delivery:  # user-confirmed" in text
     costs_tax.entry(cfg, "tax", "stcg_equity_rate", D(2026, 11, 8))
 
 
