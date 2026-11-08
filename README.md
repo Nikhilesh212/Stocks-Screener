@@ -126,4 +126,4 @@ Expect some permission prompts during a run: copying round-1 files before a re-a
 - **Own-history valuation percentiles** rest on the XBRL earnings history, often only 25-28 months, even with 10 years of prices; the tools label them "shorter than 5y".
 - **Hooks verified live** (2026-11-08): out-of-area writes, `ledger` from subagents, redirection and non-allowlisted commands are blocked, and the red team cannot read conviction files. Not verified: that `Edit(runs/**)` matches subagent writes without a prompt (the test session ran in bypass-permissions mode).
 
-Open follow-ups: a `permissions.deny` rule for `Read(.env)` (the hooks block `.env` in Bash only); whether subagents may run the read-only `ledger mark` during reviews (the hooks currently refuse the whole `ledger` group).
+Open follow-ups: whether subagents may run the read-only `ledger mark` during reviews (the hooks currently refuse the whole `ledger` group).

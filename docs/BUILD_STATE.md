@@ -24,6 +24,7 @@ Update this file and commit at the end of every phase.
 - HTTP policy: honest UA `equity-research-tool/0.1 (personal non-commercial research)`, per-host rate limits, robots.txt respected, 401/403 = blocked (never retry with altered headers). If a source refuses the honest UA, report to user; user decides per source.
 - Subagents: `model: opus`, `effort: high`; block the `Agent` tool in all four (subagents can nest by default).
 - `.claude/settings.json` allowlist approved by user: `Bash(uv run python -m tools *)`, `WebSearch`, `WebFetch`, `Edit(runs/**)` (+ frontmatter hooks below).
+- `.claude/settings.json` deny list (user-approved 2026-11-08, Session G): `Read(./.env)`, `Read(./**/.env)`.
 - User restarts Claude Code after Phase E; the dry run happens after that.
 
 ## Claude Code facts verified from current docs (2026-11-08)
@@ -329,3 +330,4 @@ Run in a side session started from the build session at 11:42 IST, in **bypass-p
 - `uv run pytest`: 174 passed. `smoke --table`: 21/21 ok and no bare-number violations; most checks were served from that day's cache, while index and macro ran live. CPI was `unavailable` as expected.
 - Second dry run: not run. It is optional and needs the user's go-ahead, at about 0.5-1M tokens for `dry run: deep dive on <SYMBOL>`. It must run from a session in normal permission mode to test the `Edit(runs/**)` prompts. A round-2 send-back happens only if the red team finds a material discrepancy.
 - Wrote `docs/HANDOVER.md` covering what was built, data sources, known gaps, the DEFAULTs to confirm, E1/E2 decisions and F fixes, open follow-ups, modes and the scale of a full run. README links to it from the intro, "Scale of a full run" and "Where things live".
+- After hand-over, with the user's approval: added `permissions.deny` `Read(./.env)` and `Read(./**/.env)` to `.claude/settings.json`. In this bypass-mode session the Read tool refused a dummy `.env` at the repo root and in a subfolder; `.env.example` stayed readable. The dummy files were deleted. Removed the item from the open follow-ups in HANDOVER and README.

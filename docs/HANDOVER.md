@@ -27,7 +27,7 @@ Components:
 - **Subagents** (`.claude/agents/`): `market-strategist`, `hunter`, `company-analyst` and `red-team`. All four use Opus at high effort. The `Agent` tool is blocked, so none can spawn further subagents.
 - **Skill** (`.claude/skills/equity-research/`): `SKILL.md` holds the run protocol for every mode. `references/` holds the output schemas, evaluation, failure modes, India red flags and the valuation guide.
 - **Guard hooks** (`.claude/hooks/`): `guard_writes.py` limits each agent's writes to its own area under `runs/<run_id>/`. `guard_bash.py` allows only the tools CLI and read-only commands, and refuses `ledger` to subagents. `guard_conviction.py` stops the red team from reading any `*.conviction.json`. All three fail closed.
-- **Settings allowlist** (`.claude/settings.json`): `Bash(uv run python -m tools *)`, `WebSearch`, `WebFetch` and `Edit(runs/**)`.
+- **Settings** (`.claude/settings.json`): the allowlist is `Bash(uv run python -m tools *)`, `WebSearch`, `WebFetch` and `Edit(runs/**)`. The deny list is `Read(./.env)` and `Read(./**/.env)`, added on 2026-11-08 with your approval. A test in a bypass-mode session showed the Read tool refused a dummy `.env` at the root and one in a subfolder, while `.env.example` stayed readable. The hooks already block `.env` in Bash.
 - **Ledger**: `ledger/picks.jsonl` is append-only and written only by `ledger ...`. Post-mortems go in `ledger/postmortems/` and lessons in `ledger/lessons.md`. Dry runs go to `ledger/test/`, which is gitignored.
 
 ## Health check (Phase G, 2026-11-08)
@@ -165,7 +165,6 @@ Fixes made in F:
 
 ## Open follow-ups needing your approval
 
-- A `permissions.deny` rule for `Read(.env)`. The hooks block `.env` in Bash, but the Read tool is unguarded.
 - Letting subagents run the read-only `ledger mark` during reviews. The hooks currently refuse the whole `ledger` group.
 - Adding `Bash(jq *)` to the allowlist, to give agents a prompt-free JSON check.
 - A cross-process rate limiter (a file lock or timestamp file in `data/cache/`). It is not needed at 3 parallel analysts and untested at 5 or more.
