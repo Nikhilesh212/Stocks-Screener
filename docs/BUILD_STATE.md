@@ -14,7 +14,7 @@ Update this file and commit at the end of every phase.
 | D | Compute + ledger + tests + costs.yaml | done 2026-11-08 (Sessions D1, D2): 63 tests green |
 | E | References, 4 agents, SKILL.md, CLAUDE.md, README, settings.json, hooks | done 2026-11-08 (E1: references, hooks + tests, settings.json; E2: agents, SKILL.md, CLAUDE.md, README, `tests/test_agents.py`): 170 tests green |
 | F | Dry run (needs Claude Code restart first) | done 2026-11-08: hooks verified live; dry run `2026-11-08-dryrun` end to end (1 lens, 3 names, red team on all, portfolio, freeze to `ledger/test`); 5 tool fixes + 4 definition fixes; 174 tests green. See "Session F results" |
-| G | Hand-over | **next**: restart Claude Code (agent definitions changed in F), then start from "Session G brief" below |
+| G | Hand-over | done 2026-11-08: agent definitions confirmed live; 174 tests green; smoke 21/21 ok; `docs/HANDOVER.md` written and linked from README. Second dry run not run (optional; needs the user's go-ahead). See "Session G results" |
 
 ## Decisions in force (user-approved)
 
@@ -321,3 +321,11 @@ Goal (spec §10 Phase G): hand-over. Summarise what was built, which data source
    - scale of a full run: Session F's per-agent table; 20 names is about 13.9M subagent tokens and about 3.4 hours of critical path with batches of five (Session F results).
    - modes: README "Running research".
 4. Remind the user to restart Claude Code; update this file (Phase G done); commit locally. Never push.
+
+### Session G results (2026-11-08)
+Run in a side session started from the build session at 11:42 IST, in **bypass-permissions mode** (so `Edit(runs/**)` prompts are still unverified).
+
+- Agent definitions live: `company-analyst.md` has the dated litigation/regulator news sweep, and all four agents carry the blocked-Bash rules. They were last edited at 11:37 IST and the session process started at 11:42 IST, so its subagents load the Session F versions. A session started before 11:37 still has the old ones: restart Claude Code before the first real run.
+- `uv run pytest`: 174 passed. `smoke --table`: 21/21 ok and no bare-number violations; most checks were served from that day's cache, while index and macro ran live. CPI was `unavailable` as expected.
+- Second dry run: not run. It is optional and needs the user's go-ahead, at about 0.5-1M tokens for `dry run: deep dive on <SYMBOL>`. It must run from a session in normal permission mode to test the `Edit(runs/**)` prompts. A round-2 send-back happens only if the red team finds a material discrepancy.
+- Wrote `docs/HANDOVER.md` covering what was built, data sources, known gaps, the DEFAULTs to confirm, E1/E2 decisions and F fixes, open follow-ups, modes and the scale of a full run. README links to it from the intro, "Scale of a full run" and "Where things live".
