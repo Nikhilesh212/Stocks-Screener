@@ -9,7 +9,7 @@ Output is research for the user's own decisions, not advice. Picks the user appr
 - Every number has provenance: a tool output, or a document cited with period and page, or a dated source. No numbers from memory.
 - Arithmetic only in code: `uv run python -m tools compute calc "<expr>" --var a=<v> ...`. Never mental math.
 - No code that ranks, scores or recommends stocks. Screens are search aids, never gates.
-- Never commit `.env` or `data/cache/`. Local git only; never push.
+- Never commit `.env` or `data/cache/`. Push to `origin` (private GitHub repo Nikhilesh212/Stocks-Screener) only when the user explicitly asks.
 - The ledger is append-only: only `uv run python -m tools ledger ...` writes `ledger/picks.jsonl`; fix a record with `ledger correct`, never by editing.
 
 ## Commands

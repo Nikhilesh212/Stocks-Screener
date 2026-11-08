@@ -200,7 +200,7 @@ Why: only picks frozen with a timestamp before the outcome is known can ever be 
 1. Write `runs/<run_id>/freeze_input.json` per `output-schemas.md`: `model_id` (the model running this session), `horizon_months`, and per pick `symbol`, `weight`, `thesis` (three sentences from the dossier), `scenarios` from the conviction file (name, probability, return_pct, return_range_pct), `p_beat_benchmark`, `kill_criteria` as strings `'<criterion> (observe: <source>; by <YYYY-MM-DD>)'` from the dossier JSON, and `review_dates`. An empty `picks` list is valid when the recommendation is the index or cash. Leave `cohorts` out so the ledger reads B, C and D from the run folder.
 2. Run `uv run python -m tools ledger freeze <run_id> --approved "<the user's approval words, and the date>"` (dry runs: add `--ledger-dir ledger/test`). If validation fails, fix the input file and rerun; never edit the ledger.
 3. Confirm the five cohorts in the output (A portfolio, B deep-dived, C killed, D candidates, E index).
-4. Commit `runs/<run_id>/` and `ledger/` to local git (`git add runs/<run_id> ledger && git commit -m "Run <run_id>: frozen"`). Never push. Never commit `.env` or `data/cache/`.
+4. Commit `runs/<run_id>/` and `ledger/` to local git (`git add runs/<run_id> ledger && git commit -m "Run <run_id>: frozen"`). Push only when the user explicitly asks. Never commit `.env` or `data/cache/`.
 5. Tell the user the review dates and that review mode will check the kill criteria.
 
 ---
@@ -234,4 +234,4 @@ Why: the ledger only teaches anything if outcomes are scored honestly and turned
 3. Analyse calibration (Brier score for `p_beat_benchmark`, scenario Brier, the calibration table) and the cohort comparison (A-B, C-A, B-D, D-E, A-E), remembering that one run's gaps are mostly noise; say what the gaps would have to look like across runs before they change the process.
 4. Distil **at most five** durable lessons into `ledger/lessons.md`. Lessons are about process, not stocks. Merge or replace older lessons rather than letting the file grow.
 5. If a frozen record is wrong, use `ledger correct <record_id> --set field=JSON --reason "..."`.
-6. Commit the post-mortem and lessons to local git. Never push.
+6. Commit the post-mortem and lessons to local git. Push only when the user explicitly asks.

@@ -19,7 +19,7 @@ Update this file and commit at the end of every phase.
 ## Decisions in force (user-approved)
 
 - Mandate: all §9 defaults, each marked `# DEFAULT - confirm` in `config/mandate.yaml`.
-- Broker: none. Screener.in: not used. Python 3.12 via uv (`uv run python -m tools ...`). Local git only, no remote, no push.
+- Broker: none. Screener.in: not used. Python 3.12 via uv (`uv run python -m tools ...`). Remote `origin` (private GitHub) added 2026-11-08; push only when the user asks.
 - Smoke small cap: **CAMS** (Nifty Smallcap 250; split 10 -> 2 FV, ex 05-Dec-2025). Bonus test case: RELIANCE 1:1, ex 28-Oct-2024.
 - HTTP policy: honest UA `equity-research-tool/0.1 (personal non-commercial research)`, per-host rate limits, robots.txt respected, 401/403 = blocked (never retry with altered headers). If a source refuses the honest UA, report to user; user decides per source.
 - Subagents: `model: opus`, `effort: high`; block the `Agent` tool in all four (subagents can nest by default). Changed 2026-11-08 after hand-over, user-approved: `hunter` uses `model: sonnet` (effort high). Reason: breadth search re-checked downstream by Opus analysts and red teams; hunters were about 8% of a full run's tokens and the slowest agent on the critical path. Analyst and red team stay Opus high (hardest judgment, most of the cost).
