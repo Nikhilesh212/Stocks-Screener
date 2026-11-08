@@ -31,6 +31,7 @@ API_PATH = "historicalOR/generateSecurityWiseHistoricalData"
 PREFERRED_SERIES = ("EQ", "BE", "BZ", "SM", "ST")
 GAP_TOL = 0.15          # overnight move allowed around a parsed factor
 UNEXPLAINED_GAP = 0.25  # overnight gap that suggests an unlisted corporate action
+ROW_CAP = 70            # NSE security-wise history returns at most this many rows per call (the latest ones)
 
 
 def _chunks(start: dt.date, end: dt.date, days: int = 90):
@@ -42,21 +43,29 @@ def _chunks(start: dt.date, end: dt.date, days: int = 90):
         s = e + dt.timedelta(days=1)
 
 
+def _chunk_rows(entity: Entity, s: dt.date, e: dt.date, today: dt.date, urls: list[str]) -> list[dict]:
+    """Rows for s..e; a chunk that hits the row cap (e.g. two series traded, EQ and IL) is split in halves and refetched."""
+    immutable = e < today - dt.timedelta(days=5)
+    params = {"from": nse_date(s), "to": nse_date(e), "symbol": entity.nse_symbol, "type": "priceVolumeDeliverable", "series": "ALL"}
+    data, f = nse_api(API_PATH, params, key=f"{entity.isin}/nse_price/{s.isoformat()}_{e.isoformat()}.json",
+                      ttl_hours=None if immutable else 6.0)
+    urls.append(f.url)
+    got = (data or {}).get("data", [])
+    if got:
+        first = min(parse_date(r["mTIMESTAMP"]) for r in got)
+        if len(got) >= ROW_CAP or first > s + dt.timedelta(days=10):
+            if (e - s).days < 14:
+                raise SourceError(f"NSE returned a truncated chunk {s}..{e} ({len(got)} rows, first {first}) even after splitting")
+            mid = s + (e - s) // 2
+            return _chunk_rows(entity, s, mid, today, urls) + _chunk_rows(entity, mid + dt.timedelta(days=1), e, today, urls)
+    return got
+
+
 def raw_history(entity: Entity, start: dt.date, end: dt.date) -> tuple[pd.DataFrame, list[str]]:
     rows, urls = [], []
     today = today_ist()
     for s, e in _chunks(start, end):
-        immutable = e < today - dt.timedelta(days=5)
-        params = {"from": nse_date(s), "to": nse_date(e), "symbol": entity.nse_symbol, "type": "priceVolumeDeliverable", "series": "ALL"}
-        data, f = nse_api(API_PATH, params, key=f"{entity.isin}/nse_price/{s.isoformat()}_{e.isoformat()}.json",
-                          ttl_hours=None if immutable else 6.0)
-        urls.append(f.url)
-        got = (data or {}).get("data", [])
-        rows.extend(got)
-        if got:
-            first = min(parse_date(r["mTIMESTAMP"]) for r in got)
-            if first > s + dt.timedelta(days=10):
-                raise SourceError(f"NSE returned a truncated chunk {s}..{e} (first row {first}); reduce chunk size")
+        rows.extend(_chunk_rows(entity, s, e, today, urls))
     if not rows:
         return pd.DataFrame(), urls
     df = pd.DataFrame(rows)

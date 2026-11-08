@@ -19,7 +19,7 @@ import pandas as pd
 from ..common.errors import InputError
 from ..common.provenance import derived, missing, num
 from ..common.units import INR, INR_CR, PCT, RATIO
-from ._util import load_mandate, records_table, unadjusted_gaps
+from ._util import MANDATE_PATH, load_mandate, records_table, unadjusted_gaps
 
 SIZE_BUCKETS = (("NIFTY 100", "large (Nifty 100)"), ("NIFTY MIDCAP 150", "mid (Nifty Midcap 150)"),
                 ("NIFTY SMALLCAP 250", "small (Nifty Smallcap 250)"))
@@ -71,7 +71,8 @@ def hhi(weights: dict[str, float]) -> tuple[float | None, float | None]:
 
 
 def analyse(weights: dict[str, float], prices: dict[str, pd.DataFrame], meta: dict[str, dict], index_df: pd.DataFrame | None, *,
-            capital_inr: float | None, mandate: dict, values: dict[str, float] | None = None, value_label: str | None = None) -> dict:
+            capital_inr: float | None, mandate: dict, values: dict[str, float] | None = None, value_label: str | None = None,
+            mandate_source: str = "config/mandate.yaml") -> dict:
     if not weights:
         raise InputError("no holdings")
     if any(w < 0 for w in weights.values()):
@@ -145,19 +146,19 @@ def analyse(weights: dict[str, float], prices: dict[str, pd.DataFrame], meta: di
     h, n_eff = hhi(weights)
     out["concentration"] = {"hhi": derived(h, RATIO, formula="sum((w / sum w)^2) over invested weights"),
                             "effective_n": derived(n_eff, "count", formula="1 / hhi")}
-    out["mandate_checks"] = mandate_checks(weights, rows, mandate, tot)
+    out["mandate_checks"] = mandate_checks(weights, rows, mandate, tot, source=mandate_source)
     warns = [f"{s}: {w}" for s in syms for w in unadjusted_gaps(prices[s])]
     if warns:
         out["warnings"] = warns
     return out
 
 
-def mandate_checks(weights: dict[str, float], rows: list[dict], m: dict, tot: float) -> list[dict]:
+def mandate_checks(weights: dict[str, float], rows: list[dict], m: dict, tot: float, source: str = "config/mandate.yaml") -> list[dict]:
     """Facts about limits: each check states the limit, the observed value and whether it is breached."""
     checks = []
 
     def add(name: str, limit: Any, observed: Any, breach: bool | None, unit: str | None, note: str | None = None) -> None:
-        checks.append({"check": name, "limit": num(limit, unit, source="config/mandate.yaml") if isinstance(limit, (int, float)) else limit,
+        checks.append({"check": name, "limit": num(limit, unit, source=source) if isinstance(limit, (int, float)) else limit,
                        "observed": num(observed, unit, source="computed") if isinstance(observed, (int, float)) or observed is None else observed,
                        "breach": breach, "note": note})
     n = len(weights)
@@ -228,13 +229,18 @@ def cmd_portfolio(args) -> dict:
         idx = load_index("NIFTY 500")
     except FileNotFoundError:
         idx = None
-    mandate = load_mandate()
+    mandate_path = Path(args.mandate) if args.mandate else MANDATE_PATH
+    if not mandate_path.exists():
+        raise InputError(f"mandate file not found: {mandate_path}")
+    mandate = load_mandate(mandate_path)
+    mandate_src = args.mandate or "config/mandate.yaml"
     capital = args.capital if args.capital is not None else mandate.get("capital_inr")
     values = None
     if args.value:
         values = {k.strip().upper(): float(v) for k, _, v in (p.partition(":") for p in args.value.split(","))}
-    out = analyse(weights, prices, meta, idx, capital_inr=capital, mandate=mandate, values=values, value_label=args.value_label)
-    out["capital"] = num(capital, INR, source="--capital" if args.capital is not None else "config/mandate.yaml capital_inr") if capital else missing(
+    out = analyse(weights, prices, meta, idx, capital_inr=capital, mandate=mandate, values=values, value_label=args.value_label,
+                  mandate_source=mandate_src)
+    out["capital"] = num(capital, INR, source="--capital" if args.capital is not None else f"{mandate_src} capital_inr") if capital else missing(
         "capital_inr not set in mandate and --capital not given", INR)
     out["identities"] = {s: meta[s]["isin"] for s in weights}
     return out
@@ -245,6 +251,7 @@ def register(sub, leaf) -> None:
     p.add_argument("--holdings", help="SYM:weight,... with weights as fractions, e.g. 'RELIANCE:0.1,CAMS:0.05'")
     p.add_argument("--holdings-file", help="JSON list of {symbol, weight} (or {holdings: [...]})")
     p.add_argument("--capital", type=float, help="INR; default mandate capital_inr")
+    p.add_argument("--mandate", help="mandate YAML for the checks and capital, e.g. runs/<run_id>/mandate.yaml (default config/mandate.yaml)")
     p.add_argument("--value", help="optional SYM:X,... value metric per name (e.g. P/E from compute valuation)")
     p.add_argument("--value-label", help="what --value is, e.g. 'P/E TTM'")
     p.set_defaults(func=cmd_portfolio)

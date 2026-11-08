@@ -319,7 +319,10 @@ def test_portfolio_beta_hhi_liquidity_and_mandate():
     checks = {c["check"]: c for c in out["mandate_checks"]}
     assert checks["max_weight"]["breach"] is True and checks["max_positions"]["breach"] is False
     assert checks["min_adv_inr_crore"]["breach"] is True  # ADV 1 crore < 5
+    assert checks["max_weight"]["limit"]["source"] == "config/mandate.yaml"
     assert find_bare_numbers(out) == []
+    run_m = portfolio.analyse({"AAA": 0.1}, prices, meta, idx, capital_inr=1e5, mandate=mandate, mandate_source="runs/r/mandate.yaml")
+    assert {c["check"]: c for c in run_m["mandate_checks"]}["max_weight"]["limit"]["source"] == "runs/r/mandate.yaml"
 
 
 def test_parse_holdings():

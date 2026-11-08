@@ -119,6 +119,8 @@ Expect some permission prompts during a run: copying round-1 files before a re-a
 - **Costs**: grandfathering of pre-2018 cost, STCG basic-exemption absorption, rebate under s.87A and your slab rate are not modelled (dividend tax only with `--slab-rate`).
 - **Industry**: `data resolve` gives the broad index-list industry; basic industry comes from announcements.
 - **Rate limits are per process.** Parallel subagents each run their own tools process, so NSE sees several request streams at once. The skill starts deep dives in batches of about five; if `source_error` or HTTP 429 shows up, use smaller batches.
-- **Not yet verified live** (Session F dry run): that an out-of-area subagent write is really blocked by the frontmatter hooks, and that `Edit(runs/**)` matches the subagents' writes without prompting.
+- **Scanned PDFs**: some results PDFs have no text layer (`filings get` warns "no text layer (scanned?); OCR not attempted"). There is no OCR, so analysts fall back to transcripts and dated press reports. In the 2026-11-08 dry run this hit two of three companies.
+- **Own-history valuation percentiles** rest on the XBRL earnings history, often only 25-28 months, even with 10 years of prices; the tools label them "shorter than 5y".
+- **Hooks verified live** (2026-11-08): out-of-area writes, `ledger` from subagents, redirection and non-allowlisted commands are blocked, and the red team cannot read conviction files. Not verified: that `Edit(runs/**)` matches subagent writes without a prompt (the test session ran in bypass-permissions mode).
 
 Open follow-ups: a `permissions.deny` rule for `Read(.env)` (the hooks block `.env` in Bash only); whether subagents may run the read-only `ledger mark` during reviews (the hooks currently refuse the whole `ledger` group).

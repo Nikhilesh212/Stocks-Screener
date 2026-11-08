@@ -8,6 +8,7 @@ from ..common.periods import parse_date
 from ..common.provenance import today_ist
 from ..common.sources import TTL_LIST, TTL_LIVE, nse_api
 from .corpactions import corporate_actions
+from .prices import actions_output
 
 
 def surveillance(isin: str, symbol: str) -> dict:
@@ -41,7 +42,7 @@ def cmd_events(args) -> dict:
         "identity": e.identity(), "today": today.isoformat(),
         "upcoming_board_meetings": sorted(upcoming, key=lambda x: x["date"]), "recent_board_meetings": sorted(recent, key=lambda x: x["date"], reverse=True),
         "calendar_source": fc.url,
-        "corporate_actions_next_12m": [a.to_dict() for a in acts if a.ex_date >= today],
+        "corporate_actions_next_12m": actions_output([a.to_dict() for a in acts if a.ex_date >= today], ca_url),
         "corporate_actions_source": ca_url,
         "surveillance": surveillance(e.isin, e.nse_symbol),
         "notes": "NSE event calendar lists meetings once companies intimate them (usually 2-7 days ahead), so far-dated results dates are often absent.",

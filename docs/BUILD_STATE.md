@@ -13,8 +13,8 @@ Update this file and commit at the end of every phase.
 | C | Data layer + smoke | done 2026-11-08 (fixture tests added in Session D1) |
 | D | Compute + ledger + tests + costs.yaml | done 2026-11-08 (Sessions D1, D2): 63 tests green |
 | E | References, 4 agents, SKILL.md, CLAUDE.md, README, settings.json, hooks | done 2026-11-08 (E1: references, hooks + tests, settings.json; E2: agents, SKILL.md, CLAUDE.md, README, `tests/test_agents.py`): 170 tests green |
-| F | Dry run (needs Claude Code restart first) | **next**: restart Claude Code, then start from "Session F brief" below |
-| G | Hand-over | not started |
+| F | Dry run (needs Claude Code restart first) | done 2026-11-08: hooks verified live; dry run `2026-11-08-dryrun` end to end (1 lens, 3 names, red team on all, portfolio, freeze to `ledger/test`); 5 tool fixes + 4 definition fixes; 174 tests green. See "Session F results" |
+| G | Hand-over | **next**: restart Claude Code (agent definitions changed in F), then start from "Session G brief" below |
 
 ## Decisions in force (user-approved)
 
@@ -98,6 +98,9 @@ HTTP test seam: `tools.common.http.set_transport(fn)` swaps in a recorded-fixtur
 - HDFCBANK has no promoter group; shareholding shows promoter null, public 100.
 - HTTP rate limits are per process, so parallel subagents multiply the request rate to NSE (SKILL batches analysts about 5 at a time). See Session E2 results.
 - No tool computes P/B or dividend-yield percentiles for indices (P/E only, via `base_rates`).
+- No OCR: scanned results PDFs (no text layer) cannot be read; `filings get` warns. Hit 2 of 3 companies in the F dry run (HDFCBANK, BAJAJ-AUTO Q2FY27).
+- Own-history valuation percentiles rest on the XBRL earnings history (25-28 months for INFY, HDFCBANK, BAJAJ-AUTO), even with 10y prices.
+- `Edit(runs/**)` allowlist not verified without prompts: Session F ran in bypass-permissions mode.
 
 ## Smoke result 2026-11-08 (RELIANCE, HDFCBANK, CAMS)
 
@@ -255,3 +258,66 @@ Goal (spec §10 Phase F): a dry run end to end. One lens, three companies, red t
    - failure modes the red team caught; numbers without citations; mental math; depth differences between the three dossiers; honesty of reading logs;
    - NSE rate limiting with three parallel analysts (`source_error`, HTTP 429).
 4. Fix what the dry run exposes (agents, SKILL.md, references, tools), rerun `uv run pytest`, commit locally. Write a "Session G brief" for the hand-over: known gaps, cost DEFAULTs in `config/costs.yaml`, mandate DEFAULTs, the open follow-ups, E1 decisions 1-7 and E2 decisions 1-9.
+
+### Session F results (2026-11-08)
+Run in a side session started from the build session, 05:00-11:40 IST. That session ran in **bypass-permissions mode**, so "no permission prompt" observations do not test the `Edit(runs/**)` allowlist.
+
+**Preconditions.** Four agents and the skill loaded. `uv run pytest` 170 passed. Smoke 21/21 ok; one bare number (`data events`: `corporate_actions_next_12m[].cash_per_share`), fixed.
+
+**Hook checks** (short sonnet test subagents in `runs/2026-11-08-hooktest/`, deleted afterwards with the user's OK): all 19 actions behaved as designed.
+- hunter: Write to `hunters/` allowed; to `dossiers/` and `docs/` blocked with guard_writes' reason (so the `CLAUDE_PROJECT_DIR` fallback works); `data resolve` allowed; `ledger mark` blocked; `cat` allowed; `>` redirection blocked; `python3` blocked; `--out` outside the area blocked, inside allowed.
+- red-team: Read and `cat` of `T.conviction.json` blocked; `cat dossiers/T.*` blocked; `grep -r` over a folder holding conviction files blocked; Read of `T.md` and `ls` allowed; Write to `redteam/` allowed, to `dossiers/` blocked. Glob tool absent, Grep not listed (as E2 found).
+
+**Dry run `2026-11-08-dryrun`.** User: mandate defaults, `capital_inr` 100000; one lens (quality) plus a lens note from the market view (prefer names whose margins and balance sheets hold with Brent near $100, a weak rupee and 25-50bp more hikes); shortlist INFY, HDFCBANK, BAJAJ-AUTO; at checkpoint 2 the user chose to freeze the illustrative override (HDFCBANK 0.10, INFY 0.05, BAJAJ-AUTO 0.05) into `ledger/test` as a pipeline test. The run's recommendation was **no picks, buy the Nifty 500**: every analyst expected return was 3.7-12.6pp below the base-rate mean (15.68%), every `p_beat_benchmark` below 0.5 (0.35-0.47), and every red-team verdict `weakened`.
+
+| Agent | Minutes | Tokens | Tool calls | Notes |
+|---|---|---|---|---|
+| market-strategist | 13.1 | 134k | 65 | MOSPI CPI API SSL error (used PDF); Business Standard 403; NSE ownership PDF timeout |
+| hunter (quality) | 52.8 | 194k | 95 | 7 candidates, 9 rejected; slowest agent |
+| analyst INFY | 23.0 | 312k | 95 | complete; 2 self-corrections |
+| analyst HDFCBANK | 31.2 | 363k | 130 | complete; 4 self-corrections; hit the truncated-price bug before the fix |
+| analyst BAJAJ-AUTO | 27.0 | 358k | 131 | complete; 2 self-corrections |
+| red team INFY | 12.1 | 191k | 63 | weakened, 15 numbers re-fetched, 0 material |
+| red team BAJAJ-AUTO | 13.6 | 176k | 58 | weakened, 17 re-fetched, 0 material |
+| red team HDFCBANK | 12.7 | 170k | 63 | weakened, 14 re-fetched, 0 material |
+
+Totals [C: compute calc]: about 1.90M subagent tokens, 700 tool calls, 185 subagent-minutes, about 111 minutes on the critical path (three analysts in parallel, red teams started as each dossier finished). No context compaction in any subagent. Main session context ended at about 276k tokens (above the 200k guideline); the account's 5-hour window was at 85% by the end. A full run (1 strategist, 6 hunters, 20 names plus about 4 round-2 pairs) at Session F's per-agent averages (analyst 344k, red team 179k tokens) would be about 13.9M subagent tokens [C: compute calc] and about 3.4 hours of critical path with batches of five [C: compute calc]: several 5-hour usage windows on this plan.
+
+**What worked.**
+- Every JSON file conforms to `output-schemas.md` (checked with a script: required keys, 8-12 key numbers with provenance, scenario order and ranges, probabilities summing to 1, `.json` and `.conviction.json` scenarios equal, expected return = sum p x r).
+- `ledger freeze` validated the input; cohort discovery found A (3, cash 0.80), B (3 from `dossiers/*.json`, conviction files skipped), C (empty, noted), D (7 from `candidates.json`), E; no bare numbers. `ledger mark --no-fetch` before entry returns nulls with reasons.
+- Three parallel analysts: no HTTP 429 and no `source_error` from NSE.
+- Arithmetic went through `compute calc` in every file checked; red-team citations spot-checked against the documents (INFY Q1FY27 call p.33 matched verbatim).
+- Depth was even across the three dossiers (48-51 KB, 12 key numbers, 17-18 red-flag rows, 6 kill criteria each); reading logs were honest about "partly read" (targeted search instead of full reads, media-call transcripts only for INFY).
+
+**Failure modes caught.**
+- By the analysts themselves: BAJAJ-AUTO's tool P/E (22.9x) includes INR 1,598.81 cr of non-cash gains from taking control of KTM (AR FY26 p.371); normalised 26.1x.
+- By the red teams (all omissions or framing, no wrong numbers): INFY's FY27 1-2% CC guide includes about 1.7pp of acquisitions (Q1FY27 call p.33), so organic growth is about zero, and INR growth (10.7%) hides USD growth (1.3%); HDFCBANK's dossier missed a US SDNY securities class action (Aug-2026) and the RBI's open questions on the MSRDC penalties, and its variant view was consensus; BAJAJ-AUTO's scenarios start from an EPS 16.1% below the H1FY27 run-rate and normalise one-off gains but not same-quarter KTM losses, and a lender asset-quality figure (BACL GNPA, AR FY26 p.58) was logged as a gap though it was available.
+- Not exercised: a send-back and round 2 (no material discrepancies), a red-team kill (cohort C empty).
+
+**Where subagents went shallow or broke rules.** No rule breaks found in the files: no probabilities in dossier `.json`, no conviction file read by a red team (hooks would have blocked it), no `ledger` call by a subagent. Shallow spots: HDFCBANK's litigation news (no news sweep), BACL asset quality, annual reports and transcripts read by targeted search. Every subagent tried a blocked Bash form at least once (`sed`, `awk`, `paste`, `$VAR`/`$(...)`, here-documents; red teams also `python3` and `NAME=value` prefixes) and recovered. The BAJAJ-AUTO analyst's reply stated its conclusion ("doesn't support owning it over the Nifty 500"): not a probability, and not passed on.
+
+**Fixes made in Session F** (174 tests green):
+1. `compute portfolio --mandate PATH`: mandate checks, capital and source labels now come from the run's confirmed mandate (they read `config/mandate.yaml` before). `ledger freeze` prefers `runs/<run_id>/mandate.yaml` for horizon and `capital_inr`. SKILL Phase 5 and `output-schemas.md` pass `--mandate`. Tests added.
+2. `data prices`: a chunk that hits NSE's 70-row cap is split in halves and refetched (HDFCBANK traded EQ and IL series in 2016-17, two rows a day, so 90-day chunks were truncated; `--years 10` failed, and one chunk silently lost 8 days inside the 10-day holiday tolerance). Test parametrised on dense and sparse second series. Live: HDFCBANK `--years 10` ok, 2,479 rows from 2016-11-08.
+3. `data events`: corporate-action numbers wrapped in provenance (smoke bare-number violation).
+4. `data filings list`: warns when `--limit` (default 60) cuts the announcements list (BAJAJ-AUTO's analyst saw only the latest 60 of 145). Test added.
+5. Agent definitions: company-analyst mandatory list gains a dated litigation and regulator news sweep (queries logged) and the rerun-with-`--limit` note; kill criteria are always written for a holder, even when the analyst concludes "do not own" (analyst and red team); all four agents get an explicit list of Bash forms that are always blocked and "use Read with offset/limit" instead of `sed`. **These definition changes load only after a restart.**
+
+Not repeated: a second dry run would cost about 2M tokens and the definition fixes need a restart to load. Recommended in Phase G instead (below).
+
+### Session G brief (start here, after restarting Claude Code)
+Goal (spec §10 Phase G): hand-over. Summarise what was built, which data sources work, known gaps and limitations, how to trigger each mode, and the expected scale of a full run; remind the user to restart Claude Code so changed agents load; commit everything.
+
+1. Restart Claude Code in the repo root (agent definitions changed in Session F). `uv run pytest` (174) and `uv run python -m tools smoke --table`.
+2. Optional, ask the user first (about 0.5-1M tokens): a short second dry run to exercise what F did not: the new analyst news sweep and holder-shaped kill criteria, a round-2 send-back (main session `mkdir -p` + `cp` into `round1/`), and permission prompts in normal (non-bypass) mode for `Edit(runs/**)`. A single-company deep dive (`dry run: deep dive on <SYMBOL>`) covers most of it cheaply.
+3. Hand-over content, from this file:
+   - built: Phases C-F; tools table above; four agents, skill, hooks, settings.
+   - data sources: smoke table (all 21 ok on 2026-11-08); down or limited: MOSPI CPI API (SSL), Business Standard (403), some company fact sheets (403), scanned PDFs (no OCR).
+   - known gaps: the "Known gaps" list above (now incl. OCR, short own-history percentiles, unverified `Edit(runs/**)` prompts).
+   - user to confirm: mandate DEFAULTs in `config/mandate.yaml`; cost DEFAULTs (brokerage, DP charge) in `config/costs.yaml` once a broker is chosen; re-verify statutory rates after each Budget.
+   - decisions to tell the user: "Decisions made in E1" and "Decisions made in E2" (Session E1/E2 sections above), and Session F's fixes.
+   - open follow-ups needing approval: `permissions.deny` for `Read(.env)`; subagent access to read-only `ledger mark`; `Bash(jq *)` in the allowlist; a cross-process rate limiter (not needed at 3 parallel analysts, untested at 5+); OCR for scanned PDFs (would need a system package such as tesseract).
+   - scale of a full run: Session F's per-agent table; 20 names is about 13.9M subagent tokens and about 3.4 hours of critical path with batches of five (Session F results).
+   - modes: README "Running research".
+4. Remind the user to restart Claude Code; update this file (Phase G done); commit locally. Never push.

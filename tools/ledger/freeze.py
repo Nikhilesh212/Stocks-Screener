@@ -139,7 +139,11 @@ def build_records(run_id: str, inp: dict, market, *, approval: str, run_dir: Pat
         raise InputError("freeze input invalid: " + "; ".join(errs))
     frozen_at = frozen_at or now_iso()
     fdate = dt.date.fromisoformat(frozen_at[:10])
-    mandate = load_mandate()
+    run_mandate = run_dir / "mandate.yaml" if run_dir is not None else None
+    if run_mandate is not None and run_mandate.exists():
+        mandate, mandate_src = load_mandate(run_mandate), f"runs/{run_id}/mandate.yaml"
+    else:
+        mandate, mandate_src = load_mandate(), "config/mandate.yaml"
     horizon = int(inp.get("horizon_months") or mandate.get("horizon_months") or 12)
     notes: list[str] = []
     cohorts_in = {k: _syms(v) for k, v in (inp.get("cohorts") or {}).items() if k in ("B", "C", "D")}
@@ -180,7 +184,7 @@ def build_records(run_id: str, inp: dict, market, *, approval: str, run_dir: Pat
     horizon_end = (pd.Timestamp(fdate) + pd.DateOffset(months=horizon)).date().isoformat()
     run = {
         "record_type": "run", "record_id": f"{run_id}:run", "run_id": run_id, "frozen_at": frozen_at, "model_id": inp.get("model_id"),
-        "approval": approval, "horizon_months": num(horizon, "months", source="freeze input or config/mandate.yaml"), "horizon_end": horizon_end,
+        "approval": approval, "horizon_months": num(horizon, "months", source=f"freeze input or {mandate_src}"), "horizon_end": horizon_end,
         "entry_rule": ENTRY_RULE, "benchmark": f"{BENCHMARK} TRI",
         "benchmark_at_freeze": num(b_val, "index points", as_of=b_date, source=f"niftyindices {BENCHMARK} TRI"),
         "cohorts": {
@@ -190,7 +194,7 @@ def build_records(run_id: str, inp: dict, market, *, approval: str, run_dir: Pat
             "D": {"members": member(cohorts_in["D"])}, "E": {"index": f"{BENCHMARK} TRI"},
         },
         "cohort_definitions": COHORT_TEXT, "how_to_read": READING,
-        "capital_inr": num(mandate.get("capital_inr"), INR, source="config/mandate.yaml") if mandate.get("capital_inr") else missing(
+        "capital_inr": num(mandate.get("capital_inr"), INR, source=mandate_src) if mandate.get("capital_inr") else missing(
             "capital_inr not set; postmortem uses a notional INR 10 lakh for costs", INR),
         "notes": notes + list(getattr(market, "notes", [])),
     }

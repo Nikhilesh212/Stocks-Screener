@@ -314,7 +314,7 @@ The ledger reads `verdict`; only `killed` puts the name in cohort C.
 
 ## portfolio_holdings.json, portfolio.md (main session, Phase 5)
 
-`portfolio_holdings.json`: `{"holdings": [{"symbol": "SYM", "weight": 0.08}, ...]}`, weights as fractions of capital; cash = 1 − sum. Run `compute portfolio --holdings-file runs/<run_id>/portfolio_holdings.json`.
+`portfolio_holdings.json`: `{"holdings": [{"symbol": "SYM", "weight": 0.08}, ...]}`, weights as fractions of capital; cash = 1 − sum. Run `compute portfolio --holdings-file runs/<run_id>/portfolio_holdings.json --mandate runs/<run_id>/mandate.yaml`.
 
 ```markdown
 # Portfolio: <run_id>

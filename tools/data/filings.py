@@ -88,6 +88,9 @@ def cmd_list(args) -> dict:
         if kind in ("announcements", "all"):
             out["announcements"] = anns[: args.limit]
             out["n_items"] = len(anns)
+            if len(anns) > args.limit:
+                out["warnings"].append(f"showing the latest {args.limit} of {len(anns)} announcements in the window; "
+                                       f"rerun with --limit {len(anns)} or a narrower --from/--to window to see the rest")
         for k in ("transcripts", "presentations", "results", "ratings"):
             if kind in (k, "all"):
                 out[k] = [a for a in anns if classify(a) == k][: args.limit]

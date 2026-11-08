@@ -100,6 +100,16 @@ def test_freeze_records(frozen):
         freeze.freeze("run1", input_path=str(p), approval="again", ledger_dir=str(ldir), market=StubMarket())
 
 
+def test_freeze_reads_the_run_mandate(tmp_path):
+    (tmp_path / "mandate.yaml").write_text("horizon_months: 9\ncapital_inr: 100000\n")
+    inp = freeze_input()
+    del inp["horizon_months"]
+    recs, _ = freeze.build_records("run1", inp, StubMarket(), approval="test", run_dir=tmp_path, frozen_at="2026-01-07T15:00:00+05:30")
+    run = recs[0]
+    assert run["capital_inr"]["value"] == 100000 and run["capital_inr"]["source"] == "runs/run1/mandate.yaml"
+    assert run["horizon_months"]["value"] == 9 and run["horizon_end"] == "2026-10-07"
+
+
 def test_freeze_validation(tmp_path):
     with pytest.raises(InputError, match="approval"):
         freeze.freeze("r", input_path=None, approval=" ", ledger_dir=str(tmp_path), market=StubMarket())

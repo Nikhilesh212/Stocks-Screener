@@ -71,7 +71,7 @@ All are `uv run python -m tools <group> <command> ...`, JSON on stdout; check `s
 
 - `compute calc "<expr>" --var a=<v> --unit <u> --label "<what>"`: every derived number.
 - `compute base_rates --index "NIFTY 500" --horizon <h>`: what the benchmark may do; for "buy the index" comparisons.
-- `compute portfolio --holdings-file runs/<run_id>/portfolio_holdings.json [--capital <INR>]`: correlation, exposures, days to exit, beta stress, mandate checks.
+- `compute portfolio --holdings-file runs/<run_id>/portfolio_holdings.json --mandate runs/<run_id>/mandate.yaml`: correlation, exposures, days to exit, beta stress, mandate checks against the run's confirmed mandate (capital from it, or `--capital <INR>`).
 - `compute costs_tax --buy-value <V> --sell-value <V> --buy-date <D> --sell-date <D>`: round-trip costs and tax.
 - `ledger freeze | mark | review | postmortem | correct`: see `evaluation.md`. Dry runs add `--ledger-dir ledger/test`.
 - `data ...` and other `compute ...` commands when you need to check a number yourself.
@@ -175,7 +175,7 @@ Why: good names can still make a bad portfolio (five bets on falling rates is on
 1. Read, for every surviving name: `dossiers/<SYMBOL>.json`, `dossiers/<SYMBOL>.conviction.json` and `redteam/<SYMBOL>.json`. Read dossier sections only where you need them. Compare depth across dossiers.
 2. Resolve contradictions before sizing: high confidence with a `weakened` verdict, scenarios the red team showed do not follow from their drivers, probabilities that ignore the base rate.
 3. Size positions by expected value and downside, within mandate limits (max weight, sector weight, max names, liquidity). Sizing is judgment; do the arithmetic with `compute calc`. Write `runs/<run_id>/portfolio_holdings.json`.
-4. Run `compute portfolio --holdings-file runs/<run_id>/portfolio_holdings.json` (add `--capital` if the mandate sets capital). Read the mandate checks and fix any breach. Look for **hidden common bets**: correlation clusters and shared drivers (rates, a commodity, government capex, the rupee, one customer or regulator).
+4. Run `compute portfolio --holdings-file runs/<run_id>/portfolio_holdings.json --mandate runs/<run_id>/mandate.yaml` (without `--mandate` it checks `config/mandate.yaml`, not the values the user confirmed for this run). Read the mandate checks and fix any breach. Look for **hidden common bets**: correlation clusters and shared drivers (rates, a commodity, government capex, the rupee, one customer or regulator).
 5. Run `compute costs_tax` for a representative position over the horizon, so the cost and tax drag is explicit.
 6. Compare explicitly with "buy the Nifty 500" (use `compute base_rates` and the market view) and with "hold cash". Say why the portfolio is better, or recommend fewer names, the index, or cash.
 7. Write `runs/<run_id>/portfolio.md` and `runs/<run_id>/final_report.md`.

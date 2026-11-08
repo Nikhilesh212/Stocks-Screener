@@ -94,6 +94,25 @@ def test_reliance_bonus_adjustment(routes):
     assert h["path"].exists()
 
 
+@pytest.mark.parametrize("il_every", [1, 8])
+def test_truncated_price_chunk_is_split_and_refetched(monkeypatch, il_every):
+    """A second series (EQ + IL, as HDFCBANK in 2016-17) pushes a 90-day chunk past NSE's row cap.
+    With sparse IL rows the cut-off first row can still fall within the 10-day holiday tolerance."""
+    def fake_nse_api(path, params, key, ttl_hours):
+        s, e = (dt.date.fromisoformat(x) for x in key.rsplit("/", 1)[1].removesuffix(".json").split("_"))
+        days = [s + dt.timedelta(days=i) for i in range((e - s).days + 1) if (s + dt.timedelta(days=i)).weekday() < 5]
+        rows = [{"mTIMESTAMP": d.strftime("%d-%b-%Y"), "CH_SERIES": ser, "CH_PREVIOUS_CLS_PRICE": 100, "CH_OPENING_PRICE": 100,
+                 "CH_TRADE_HIGH_PRICE": 100, "CH_TRADE_LOW_PRICE": 100, "CH_CLOSING_PRICE": 100, "CH_TOT_TRADED_QTY": 1,
+                 "CH_TOT_TRADED_VAL": 100} for i, d in enumerate(days) for ser in ("EQ", "IL") if ser == "EQ" or i % il_every == 0]
+        return {"data": rows[-70:]}, argparse.Namespace(url=f"https://nse.test/{s}_{e}")
+    monkeypatch.setattr(prices, "nse_api", fake_nse_api)
+    df, urls = prices.raw_history(RELIANCE, D(2017, 2, 6), D(2017, 5, 6))
+    assert df["date"].iloc[0] == D(2017, 2, 6) and df["date"].iloc[-1] == D(2017, 5, 5)
+    weekdays = sum((D(2017, 2, 6) + dt.timedelta(days=i)).weekday() < 5 for i in range(90))
+    assert len(df) == len(set(df["date"])) == weekdays and set(df["series"]) == {"EQ"}
+    assert len(urls) > 1
+
+
 def test_cams_split_adjustment(routes):
     routes({"generateSecurityWiseHistoricalData": "nse_price_CAMS_2025-11.json",
             "corporates-corporateActions": "nse_ca_CAMS.json"})
@@ -307,3 +326,14 @@ def test_xbrl_undefined_main_contexts_are_dated_from_filing():
     assert inst.synthesized == ["FourD", "OneD", "OneI"]
     (ctx, value, _), = xbrl.values_by_period(inst, "RevenueFromOperations")
     assert ctx.id == "FourD" and value == 4863260000000
+
+
+def test_filings_list_warns_when_announcements_are_cut(monkeypatch):
+    from tools.data import filings
+    anns = [{"date": f"0{i}-Nov-2026", "category": "General", "text": "x", "url": "https://x.test"} for i in (3, 2, 1)]
+    monkeypatch.setattr(filings, "get_entity", lambda q: RELIANCE)
+    monkeypatch.setattr(filings, "announcements", lambda e, s, t: (anns, ["https://nse.test"]))
+    args = argparse.Namespace(query="RELIANCE", to=None, start=None, months=12, kind="announcements", limit=2)
+    out = filings.cmd_list(args)
+    assert len(out["announcements"]) == 2 and out["n_items"] == 3
+    assert any("latest 2 of 3" in w for w in out["warnings"])
