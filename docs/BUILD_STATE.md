@@ -19,7 +19,8 @@ Update this file and commit at the end of every phase.
 ## Decisions in force (user-approved)
 
 - Mandate: all §9 defaults, each marked `# DEFAULT - confirm` in `config/mandate.yaml`.
-- Broker: none. Screener.in: not used. Python 3.12 via uv (`uv run python -m tools ...`). Remote `origin` (private GitHub) added 2026-11-08; push only when the user asks.
+- Broker: none. Screener.in: not used. Python 3.12 via uv (`uv run python -m tools ...`). Remote `origin` (GitHub Nikhilesh212/Stocks-Screener, public) added 2026-11-08; push only when the user asks.
+- 2026-11-08 after hand-over (user-approved): history rewritten to author and committer Nikhilesh212 <58919032+Nikhilesh212@users.noreply.github.com> (also set in repo git config); `runs/2026-11-08-dryrun` removed from history (kept locally) and `runs/` plus `ledger/` records gitignored, so personal research never reaches the public repo (SKILL Phase 7 and post-mortem no longer commit); licence AGPL-3.0-only with commercial licences from the author, replacing MIT; `CONTRIBUTING.md` asks contributors for a licence that keeps commercial licensing possible.
 - Smoke small cap: **CAMS** (Nifty Smallcap 250; split 10 -> 2 FV, ex 05-Dec-2025). Bonus test case: RELIANCE 1:1, ex 28-Oct-2024.
 - HTTP policy: honest UA `equity-research-tool/0.1 (personal non-commercial research)`, per-host rate limits, robots.txt respected, 401/403 = blocked (never retry with altered headers). If a source refuses the honest UA, report to user; user decides per source.
 - Subagents: `model: opus`, `effort: high`; block the `Agent` tool in all four (subagents can nest by default). Changed 2026-11-08 after hand-over, user-approved: `hunter` uses `model: sonnet` (effort high). Reason: breadth search re-checked downstream by Opus analysts and red teams; hunters were about 8% of a full run's tokens and the slowest agent on the critical path. Analyst and red team stay Opus high (hardest judgment, most of the cost).
@@ -109,16 +110,16 @@ All 21 checks returned ok. Verified adjustments: RELIANCE bonus 1:1 ex 2024-10-2
 
 ## Session D1 results (2026-11-08)
 
-Session C's open issues, all resolved (commit 3c8b088):
+Session C's open issues, all resolved (commit 5c7e16c):
 1. Bare numbers: `resolve` wraps `face_value_inr` (`tools/data/resolve.py: resolve_output`); `prices` wraps the corporate-action numbers (`prices.actions_output`). Smoke `_note` was updated for the new shape.
 2. HDFCBANK quarter-sum flag: **a tagging inconsistency by the filer, not a parse error.** Interest earned reconciles exactly. In the Q2FY26, Q4FY26/FY26 and Q2FY27 filings HDFC Bank files `ProfitLossOfMinorityInterest` = 0 and tags `ProfitLossForThePeriod` with the after-minority figure. In Q1FY26 and Q3FY26 it files PAT before minority interest. Changes: bank mapping gained `minority_interest`; the crosscheck table has a `note` column that explains this automatically; a `pat_owners` check was added (FY26 pat_owners reconciles exactly). FY25 pat_owners does not fully reconcile either: cause not identified (legacy filings).
 3. CAMS "only 4 quarters": could not reproduce. Both list caches date from the smoke run, and all 8 requested consolidated quarters now parse, with no warnings. The smoke-run XBRL downloads probably failed transiently (their warnings were hidden). Financials output now has a `coverage` block (requested/returned/missing quarters, and whether each missing quarter is in the other basis), and the smoke note shows missing quarters and the warning count. The two bases are deliberately never mixed in one table.
 4. Empty-response cache: `cache.is_empty_payload()`. Empty bodies get `ttl_hours=6` in their meta (EMPTY_TTL_HOURS), which overrides an immutable TTL. `read_cached` also expires empty bodies that were cached earlier.
 5. Smoke snapshot note now prints row count and date.
 
-New bug found and fixed (commit c322261): **shareholding** was null for every filing before Jun-2025 (old taxonomy: context ids without `_Context`, e.g. `ShareholdingOfPromoterAndPromoterGroupI`, plus government split into central and state). The Jun-2025 filings showed 5007% because they store percent, not fractions. `parse_shp` now tries both context sets and picks the scale from promoter + public = 1 or 100 (`scale_evidence` column). A company with no promoter group now gets `pledge_evidence` "no promoter group". Old filings report promoter 0.0 and new ones report null (both as filed). RELIANCE/CAMS/HDFCBANK now give 12 full quarters.
+New bug found and fixed (commit f039667): **shareholding** was null for every filing before Jun-2025 (old taxonomy: context ids without `_Context`, e.g. `ShareholdingOfPromoterAndPromoterGroupI`, plus government split into central and state). The Jun-2025 filings showed 5007% because they store percent, not fractions. `parse_shp` now tries both context sets and picks the scale from promoter + public = 1 or 100 (`scale_evidence` column). A company with no promoter group now gets `pledge_evidence` "no promoter group". Old filings report promoter 0.0 and new ones report null (both as filed). RELIANCE/CAMS/HDFCBANK now give 12 full quarters.
 
-Fixture tests (commit c322261): `tests/conftest.py` (autouse: refuse-all transport, CACHE_ROOT -> tmp in every module that binds it, rate limits off; `routes({...})` fixture), `tests/test_data_layer.py` (33 tests, green), `tests/fixtures/record.py` re-records trimmed fixtures from `data/cache`.
+Fixture tests (commit f039667): `tests/conftest.py` (autouse: refuse-all transport, CACHE_ROOT -> tmp in every module that binds it, rate limits off; `routes({...})` fixture), `tests/test_data_layer.py` (33 tests, green), `tests/fixtures/record.py` re-records trimmed fixtures from `data/cache`.
 
 Also added: `tools/common/errors.py: InputError`, which the CLI reports as status `input_error`, exit 2. `META_INT_KEYS` now includes `requested_quarters`, `returned_quarters`, `n_picks` and `n_records`.
 

@@ -11,3 +11,9 @@ data/manual/*
 
 # ledger dry runs (Session F uses ledger/test)
 ledger/test/
+
+# personal research output stays on this machine: the GitHub repository is public
+runs/
+ledger/*.jsonl
+ledger/postmortems/
+ledger/lessons.md

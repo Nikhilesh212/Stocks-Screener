@@ -70,9 +70,9 @@ Start a Claude Code session in the repo root and ask in plain words. The `equity
 | Post-mortem | "post-mortem 2026-10-15-dhanteras" | `ledger postmortem`: returns net of cost and tax, Brier score and calibration, cohorts A-E, and at most five lessons into `ledger/lessons.md` |
 | Dry run | add "dry run" to any of the above, e.g. "dry run: deep dive on CAMS" | `run_id` is `<date>-dryrun[-slug]` and every ledger command gets `--ledger-dir ledger/test`. The real ledger stays clean |
 
-A freeze happens only after your explicit approval in chat, and the run is then committed to local git. Nothing is ever pushed, and nothing places orders.
+A freeze happens only after your explicit approval in chat. Runs and the ledger stay on your machine (gitignored, because the GitHub repository is public), so back them up yourself. Nothing places orders.
 
-Expect permission prompts during a run in normal (non-bypass) mode: copying round-1 files before a re-analysis, git commits, edits under `ledger/`, and any Bash a subagent runs other than the tools CLI and Claude Code's built-in read-only commands.
+Expect permission prompts during a run in normal (non-bypass) mode: copying round-1 files before a re-analysis, edits under `ledger/`, and any Bash a subagent runs other than the tools CLI and Claude Code's built-in read-only commands.
 
 ## Scale of a full run
 

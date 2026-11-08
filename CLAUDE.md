@@ -9,7 +9,7 @@ Output is research for the user's own decisions, not advice. Picks the user appr
 - Every number has provenance: a tool output, or a document cited with period and page, or a dated source. No numbers from memory.
 - Arithmetic only in code: `uv run python -m tools compute calc "<expr>" --var a=<v> ...`. Never mental math.
 - No code that ranks, scores or recommends stocks. Screens are search aids, never gates.
-- Never commit `.env` or `data/cache/`. Push to `origin` (private GitHub repo Nikhilesh212/Stocks-Screener) only when the user explicitly asks.
+- Never commit `.env`, `data/cache/`, `runs/` or `ledger/` records (all gitignored: `origin`, GitHub Nikhilesh212/Stocks-Screener, is public). Push to `origin` only when the user explicitly asks.
 - The ledger is append-only: only `uv run python -m tools ledger ...` writes `ledger/picks.jsonl`; fix a record with `ledger correct`, never by editing.
 
 ## Commands
@@ -25,6 +25,6 @@ Output is research for the user's own decisions, not advice. Picks the user appr
 - `tools/` CLI (`data`, `compute`, `ledger`, `smoke`); `tests/` pytest
 - `config/` `mandate.yaml`, `sources.yaml`, `costs.yaml`
 - `.claude/skills/equity-research/` `SKILL.md` (run protocol) and `references/`; `.claude/agents/` four subagents; `.claude/hooks/` guards on subagent writes, Bash and conviction files
-- `runs/<run_id>/` one folder per run; `ledger/` `picks.jsonl`, `postmortems/`, `lessons.md`; `ledger/test/` dry runs (gitignored)
+- `runs/<run_id>/` one folder per run; `ledger/` `picks.jsonl`, `postmortems/`, `lessons.md`; `ledger/test/` dry runs. `runs/` and `ledger/` records are gitignored and stay on this machine
 - `data/cache/` downloads and extracted text keyed by ISIN (gitignored)
 - `docs/BUILD_STATE.md` build status, decisions, known gaps; `docs/SPEC.md` original spec

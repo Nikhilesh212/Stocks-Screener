@@ -83,7 +83,7 @@ How a run is judged: expected excess return over the Nifty 500 TRI over the hori
 
 A full run spawns about 1 strategist + 6 hunters + one analyst and one red team per shortlisted name, plus a second round for names sent back. For 20 names that is roughly 45-55 subagent runs at high effort (Opus, except the six hunters on Sonnet), each with dozens to over a hundred tool calls, and several hours of wall time. It uses a lot of your plan's usage; the session tells you its estimate before the deep dives and you can cut the list. A single-company deep dive is two or three subagent runs. Measured numbers from the 2026-11-08 dry run, and the estimate for a full 20-name run, are in [`docs/HANDOVER.md`](docs/HANDOVER.md#scale-of-a-full-run).
 
-Expect some permission prompts during a run: copying round-1 files before a re-analysis, git commits, edits under `ledger/`, and any Bash command a subagent runs other than the tools CLI and Claude Code's built-in read-only commands (`ls`, `cat`, `grep`, `find`, ...).
+Expect some permission prompts during a run: copying round-1 files before a re-analysis, edits under `ledger/`, and any Bash command a subagent runs other than the tools CLI and Claude Code's built-in read-only commands (`ls`, `cat`, `grep`, `find`, ...).
 
 ## Review and post-mortem
 
@@ -127,3 +127,19 @@ Expect some permission prompts during a run: copying round-1 files before a re-a
 - **Hooks verified live** (2026-11-08): out-of-area writes, `ledger` from subagents, redirection and non-allowlisted commands are blocked, and the red team cannot read conviction files. Not verified: that `Edit(runs/**)` matches subagent writes without a prompt (the test session ran in bypass-permissions mode).
 
 Open follow-ups: whether subagents may run the read-only `ledger mark` during reviews (the hooks currently refuse the whole `ledger` group).
+
+## Disclaimer
+
+This is a research tool, not investment advice. The author is not registered with SEBI as an investment adviser or research analyst, and nothing in this repository or its output is a recommendation to buy or sell any security. You make and own your decisions.
+
+The tools read public sources (NSE, niftyindices.com, RBI and company filings) under those sources' own terms of use. You are responsible for following them, keeping request rates polite, and setting `ER_USER_AGENT` in `.env` to identify yourself. Runs use your Claude Code plan; a full run spans several 5-hour usage windows (see [`docs/HANDOVER.md`](docs/HANDOVER.md#scale-of-a-full-run)).
+
+## Licence
+
+Copyright (C) 2026 Nikhilesh212.
+
+Released under the [GNU Affero General Public License v3.0 only](LICENSE) (AGPL-3.0-only). You may use, modify and even sell it, but if you distribute it, or let others use a modified version over a network, you must release your complete source under the same licence. The PDF library it depends on, PyMuPDF, is also AGPL-3.0.
+
+**Commercial licence.** To build this into a closed-source product or service without the AGPL's obligations, contact [Nikhilesh212 on GitHub](https://github.com/Nikhilesh212) for a separate commercial licence.
+
+Contributions are accepted on the terms in [`CONTRIBUTING.md`](CONTRIBUTING.md).
