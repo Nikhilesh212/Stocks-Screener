@@ -341,4 +341,9 @@ Side session started from the build session after the repository went public. NS
 - `tests/conftest.py`: `require_fixtures()` (called by the `routes` fixture) and a `pytest_runtest_call` wrapper that turns a missing `FIXTURES / name` read into a skip. The message is "real fixtures not recorded: run `uv run python tests/fixtures/record.py --fetch`" plus the missing files. `tests/test_data_layer.py` is unchanged.
 - `.gitignore` ignores `tests/fixtures/*` except `*.py`, `README*` and `.gitkeep`, and the 14 data files were removed from the index (`git rm --cached`) but kept on disk. The old exception for PDF fixtures was dropped.
 - Verified: with the fixtures present, 174 passed and none skipped. In a scratch copy without them, 162 passed and 12 skipped, with no errors. `record.py --fetch` from an empty `data/cache` in the worktree made 32 live requests, and all 14 regenerated fixtures were **byte-identical** to the committed ones. Rebuilding from the main checkout's existing cache was also byte-identical. 174 passed on the regenerated fixtures. With no cache, `record.py` exits 1 with "cannot record nse_price_RELIANCE_2024-10.json: data/cache/... not found (run with --fetch)".
-- The old fixture files are still in git history unless the user chooses a history rewrite.
+- History purged with the user's approval (2026-11-08). `master` was fast-forwarded to this commit. `git filter-branch --index-filter` then removed `tests/fixtures/*.json` and `*.xml` from every local branch, and `master` was force-pushed to `origin main` with `--force-with-lease`.
+  - Authors, dates and messages are unchanged; each rewritten commit differs only by the 14 files.
+  - A `git bundle` of all refs from before the rewrite was saved in that session's `/tmp` scratchpad.
+  - The `gold-silver-analysis` worktree's branch was moved to the rewritten base, keeping its uncommitted edits and its fixture files on disk.
+  - The shared `.git/info/exclude` also ignores the fixture files, for worktrees whose `.gitignore` predates this change.
+  - GitHub keeps the old commits reachable by SHA until GitHub Support purges them.
