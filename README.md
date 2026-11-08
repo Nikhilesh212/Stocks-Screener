@@ -81,7 +81,7 @@ How a run is judged: expected excess return over the Nifty 500 TRI over the hori
 
 ### Scale of a full run
 
-A full run spawns about 1 strategist + 6 hunters + one analyst and one red team per shortlisted name, plus a second round for names sent back. For 20 names that is roughly 45-55 Opus subagent runs at high effort, each with dozens to over a hundred tool calls, and several hours of wall time. It uses a lot of your plan's usage; the session tells you its estimate before the deep dives and you can cut the list. A single-company deep dive is two or three subagent runs. Measured numbers from the 2026-11-08 dry run, and the estimate for a full 20-name run, are in [`docs/HANDOVER.md`](docs/HANDOVER.md#scale-of-a-full-run).
+A full run spawns about 1 strategist + 6 hunters + one analyst and one red team per shortlisted name, plus a second round for names sent back. For 20 names that is roughly 45-55 subagent runs at high effort (Opus, except the six hunters on Sonnet), each with dozens to over a hundred tool calls, and several hours of wall time. It uses a lot of your plan's usage; the session tells you its estimate before the deep dives and you can cut the list. A single-company deep dive is two or three subagent runs. Measured numbers from the 2026-11-08 dry run, and the estimate for a full 20-name run, are in [`docs/HANDOVER.md`](docs/HANDOVER.md#scale-of-a-full-run).
 
 Expect some permission prompts during a run: copying round-1 files before a re-analysis, git commits, edits under `ledger/`, and any Bash command a subagent runs other than the tools CLI and Claude Code's built-in read-only commands (`ls`, `cat`, `grep`, `find`, ...).
 

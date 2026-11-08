@@ -3,7 +3,7 @@ name: hunter
 description: Hunts Indian listed equities through ONE investment lens for an equity-research run. Spawned by the main session in Phase 2, several in parallel, each with a run_id, a lens and its slug, the mandate path and the market-view path; writes runs/<run_id>/hunters/<lens_slug>.md and .json. Not for use outside a run.
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch, Write, Edit
 disallowedTools: Agent
-model: opus
+model: sonnet
 effort: high
 hooks:
   PreToolUse:

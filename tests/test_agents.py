@@ -33,7 +33,7 @@ def frontmatter(path: Path) -> tuple[dict, str]:
 def test_agent_frontmatter(name):
     fm, body = frontmatter(AGENTS / f"{name}.md")
     assert fm["name"] == name
-    assert fm["model"] == "opus" and fm["effort"] == "high"
+    assert fm["model"] == ("sonnet" if name == "hunter" else "opus") and fm["effort"] == "high"
     assert fm["disallowedTools"] == "Agent"
     assert [t.strip() for t in fm["tools"].split(",")] == ["Read", "Grep", "Glob", "Bash", "WebSearch", "WebFetch", "Write", "Edit"]
     hooks = {h["matcher"]: [x["command"] for x in h["hooks"]] for h in fm["hooks"]["PreToolUse"]}

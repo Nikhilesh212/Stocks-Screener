@@ -24,7 +24,7 @@ The research system is built and has passed one end-to-end dry run. This page is
 
 Components:
 - **Tools CLI**: `uv run python -m tools <data|compute|ledger|smoke> ...`. The output is JSON with provenance on every number; check `status` first. `data` covers resolve, prices (adjusted for corporate actions), bhavcopy, index history and constituents, filings (list, get, search, pages with page numbers), XBRL financials, shareholding, macro and events. `compute` covers calc, ratios, valuation, reverse DCF, technicals, base rates, portfolio and costs/tax. `ledger` covers freeze, mark, review, postmortem and correct. The full tables are in `BUILD_STATE.md` under "Data layer as built". `--help` works on every command.
-- **Subagents** (`.claude/agents/`): `market-strategist`, `hunter`, `company-analyst` and `red-team`. All four use Opus at high effort. The `Agent` tool is blocked, so none can spawn further subagents.
+- **Subagents** (`.claude/agents/`): `market-strategist`, `hunter`, `company-analyst` and `red-team`. The strategist, analyst and red team use Opus at high effort; the hunter uses Sonnet at high effort (changed 2026-11-08 at your request: its breadth search is re-checked by Opus analysts and red teams downstream). The `Agent` tool is blocked, so none can spawn further subagents.
 - **Skill** (`.claude/skills/equity-research/`): `SKILL.md` holds the run protocol for every mode. `references/` holds the output schemas, evaluation, failure modes, India red flags and the valuation guide.
 - **Guard hooks** (`.claude/hooks/`): `guard_writes.py` limits each agent's writes to its own area under `runs/<run_id>/`. `guard_bash.py` allows only the tools CLI and read-only commands, and refuses `ledger` to subagents. `guard_conviction.py` stops the red team from reading any `*.conviction.json`. All three fail closed.
 - **Settings** (`.claude/settings.json`): the allowlist is `Bash(uv run python -m tools *)`, `WebSearch`, `WebFetch` and `Edit(runs/**)`. The deny list is `Read(./.env)` and `Read(./**/.env)`, added on 2026-11-08 with your approval. A test in a bypass-mode session showed the Read tool refused a dummy `.env` at the root and one in a subfolder, while `.env.example` stayed readable. The hooks already block `.env` in Bash.
@@ -131,7 +131,7 @@ Set by the spec, not defaults: benchmark `NIFTY 500 TRI`, `min_positions: 0` (in
 
 ## Decisions made during the build
 
-Approved by the user in Phases A-B: all mandate defaults; no broker; Screener.in not used; Python 3.12 via uv; local git only, no remote; CAMS as the small-cap smoke case; subagents on Opus at high effort with `Agent` blocked; the settings allowlist above.
+Approved by the user in Phases A-B: all mandate defaults; no broker; Screener.in not used; Python 3.12 via uv; local git only, no remote; CAMS as the small-cap smoke case; subagents on Opus at high effort with `Agent` blocked (hunter moved to Sonnet at high effort after hand-over, 2026-11-08); the settings allowlist above.
 
 Made in E1:
 1. Red-team verdicts are `survives | weakened | killed`, and only `killed` puts a name in cohort C. A red-team JSON also has `send_back` (material numerical discrepancies) and `round` (1 or 2).
